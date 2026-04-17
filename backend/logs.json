@@ -1,0 +1,18 @@
+[
+  {
+    "request_id": "4c722e41-f66d-4d6d-a360-a9bcb098481a",
+    "time": "2026-04-01 08:50:56.914044",
+    "question": "Why is M30 concrete used in bridges?",
+    "answer": "\n            \ud83d\udcc4 Direct Answer (Fast Mode):\n\n            but because many of the tests are of long duration, mix design may take 6 months or\nmore.\nLightweight Concrete. Although the concrete most often ",
+    "source": "document",
+    "confidence": 0.8
+  },
+  {
+    "request_id": "a8bcb42f-e759-4a38-b800-184de0cd2576",
+    "time": "2026-04-01 16:57:04.655387",
+    "question": "Why is M30 concrete used in bridges?",
+    "answer": "\n1. Final Answer: M30 concrete is not explicitly mentioned as being used in bridges, but rather a general reference to high-strength concrete is made.\n\n2. Technical Explanation: High-strength concrete",
+    "source": "graph",
+    "confidence": 0.0
+  }
+]

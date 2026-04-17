@@ -1,0 +1,50 @@
+[
+  {
+    "request_id": "e9b67352-4f57-459b-8f97-4d54e8b2182d",
+    "time": "2026-04-17 07:36:43.648305",
+    "question": "Share one AI automation or chatbot project you have built.",
+    "answer": "Project not found.\nConfidence: 0.4",
+    "source": "hybrid",
+    "confidence": 0.4
+  },
+  {
+    "request_id": "584f74ea-d3b7-4299-9525-45607ae51f4a",
+    "time": "2026-04-17 07:38:09.764839",
+    "question": "What is Torque requirement",
+    "answer": "\n1. **Final Answer**: The torque requirement for the HDPE pipe is not explicitly calculated in the provided data. However, it can be inferred that the torque requirement would be related to the thrust and the geometry of the pipe.\n\n2. **Technical Explanation**: To determine the torque requirement fo",
+    "source": "graph",
+    "confidence": 0.02
+  },
+  {
+    "request_id": "27a2ed27-73f7-4f6b-aeed-5918ea55f7ad",
+    "time": "2026-04-17 07:48:00.347242",
+    "question": "can you tell me Benefits and Fundamentals of Lighting",
+    "answer": "\n1. **Final Answer:**\nThe benefits of properly designed and installed roadway lighting include significant reductions in nighttime traffic accidents, deterrence of crime, and increased commercial activity.\n\n2. **Technical Explanation:**\nRoadway lighting plays a crucial role in enhancing safety and f",
+    "source": "graph",
+    "confidence": 0.01
+  },
+  {
+    "request_id": "b10b004d-c1c5-4b66-86d0-61fc2f0a3092",
+    "time": "2026-04-17 09:59:41.510657",
+    "question": "what are the  construction  consideration",
+    "answer": "\n1. **Final Answer:**\n   Construction considerations for wall types include factors such as constructibility, maintenance, schedule, aesthetics, environmental impact, durability, availability of standard designs, and cost.\n\n2. **Technical Explanation:**\n   When selecting wall types for construction,",
+    "source": "graph",
+    "confidence": 0.0
+  },
+  {
+    "request_id": "26fd0185-7986-4595-93cf-40e92269f44d",
+    "time": "2026-04-17 10:11:25.148915",
+    "question": "what is Anticorrosive treatment and where it is used in india",
+    "answer": "\n1. **Final Answer:**\nAnticorrosive treatment refers to protective measures applied to materials, particularly concrete and reinforcement steel, to prevent corrosion, especially in environments with saline and severe exposure conditions. In India, it is commonly used in bridge construction and other",
+    "source": "graph",
+    "confidence": 0.0
+  },
+  {
+    "request_id": "c0c12e09-cc65-4691-bb21-e9b1c9a20c53",
+    "time": "2026-04-17 10:20:18.087505",
+    "question": "show the material need to be selected for main superstructure members",
+    "answer": "\n\ud83d\udcc4              Engineering Answer (High Confidence)\n\n                \n### 1. Final Answer\nThe material selected for the main superstructure members of a bridge should primarily be reinforced concrete or structural steel, depending on the design requirements, load conditions, and environmental facto",
+    "source": "graph",
+    "confidence": 0.9
+  }
+]

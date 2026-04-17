@@ -1,0 +1,53 @@
+# ---------------- CORE LANGCHAIN ----------------
+langchain==0.3.27
+langchain-core==0.3.75
+langchain-community==0.3.27
+langchain-openai==0.3.30
+langgraph==0.6.5
+
+# ---------------- LLM ----------------
+openai==1.99.9
+
+# ---------------- VECTOR STORE ----------------
+faiss-cpu==1.12.0
+
+# ---------------- EMBEDDINGS ----------------
+sentence-transformers==3.0.1
+torch==2.7.1
+
+# ---------------- DOCUMENT PROCESSING ----------------
+pypdf==4.3.1
+pdf2image==1.17.0
+pytesseract==0.3.10
+opencv-python==4.10.0.84
+layoutparser==0.3.4
+
+# ---------------- AZURE ----------------
+azure-ai-formrecognizer==3.3.3
+
+# ---------------- API ----------------
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.8.2
+
+# ---------------- UI ----------------
+streamlit==1.48.1
+
+# ---------------- UTIL ----------------
+python-dotenv==1.1.1
+requests==2.32.4
+beautifulsoup4==4.13.4
+wikipedia==1.4.0
+networkx==3.3
+
+python-multipart
+unstructured 
+pdfminer.six 
+pytesseract 
+pillow
+
+unstructured[pdf]
+pillow-heif
+pytesseract
+pdf2image
+pi-heif

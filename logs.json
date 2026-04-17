@@ -1,0 +1,18 @@
+[
+  {
+    "request_id": "d6d336ef-c87b-47ff-bf03-f8d1686be481",
+    "time": "2026-04-14 17:05:21.820657",
+    "question": "what is this ANTICORROSIVE treatment?",
+    "answer": "\n1. **Final Answer**: The anticorrosive treatment for bridge structures involves applying protective coatings to both concrete and reinforcement steel to prevent corrosion, particularly in saline and ",
+    "source": "graph",
+    "confidence": 0.12
+  },
+  {
+    "request_id": "1d78e9de-faae-4543-8729-90c8bffd4e9c",
+    "time": "2026-04-16 08:25:37.842801",
+    "question": "what is geometric design",
+    "answer": "\n1. **Final Answer**: Geometric design refers to the layout and configuration of physical elements in civil engineering projects, particularly in the design of roadways and bridges, focusing on the di",
+    "source": "graph",
+    "confidence": 0.0
+  }
+]
