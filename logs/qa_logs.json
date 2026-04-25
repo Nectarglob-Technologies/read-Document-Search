@@ -46,5 +46,189 @@
     "answer": "\n\ud83d\udcc4              Engineering Answer (High Confidence)\n\n                \n### 1. Final Answer\nThe material selected for the main superstructure members of a bridge should primarily be reinforced concrete or structural steel, depending on the design requirements, load conditions, and environmental facto",
     "source": "graph",
     "confidence": 0.9
+  },
+  {
+    "request_id": "a319102b-a85e-40ec-92cb-3bdc16bc521b",
+    "time": "2026-04-23 22:02:23.881453",
+    "question": "Please provide details on safety system",
+    "answer": "\n1. **Final Answer:**\n   The safety system in highway engineering primarily focuses on roadside safety, which aims to minimize the likelihood of serious injuries when vehicles leave the roadway. This involves the implementation of various safety treatments and devices designed to enhance life safety",
+    "source": "graph",
+    "confidence": 0.02
+  },
+  {
+    "request_id": "e5515bfc-330c-41ad-8205-39beb886f083",
+    "time": "2026-04-23 22:40:02.003479",
+    "question": "replacement for the bridges",
+    "answer": "\n1. **Final Answer**: The recommended approach for replacing bridges involves utilizing prefabricated structures, such as reinforced concrete box culverts or long-span corrugated metal structures, which can be constructed with minimal service disruption and often at a lower cost. \n\n2. **Technical Ex",
+    "source": "graph",
+    "confidence": 0.0
+  },
+  {
+    "request_id": "82aee607-c568-4415-a6fb-0b43a00598b8",
+    "time": "2026-04-23 22:41:32.658709",
+    "question": "Explain pavement management",
+    "answer": "\n1. **Final Answer:**\nPavement management is a systematic approach to evaluating, monitoring, and maintaining pavement infrastructure to ensure its optimal performance and longevity. It involves assessing the current condition of pavements, predicting future deterioration, and determining the most c",
+    "source": "graph",
+    "confidence": 0.01
+  },
+  {
+    "request_id": "f1c7d7e7-3d83-47e0-8d41-ef28699270ad",
+    "time": "2026-04-23 22:49:44.599446",
+    "question": "how to Estimate Maximum Reinforcement Load Using the K0-Stiffness Method?",
+    "answer": "\n1. **Final Answer:**\nTo estimate the maximum reinforcement load (Tmax) using the K0-Stiffness Method, you can follow the procedure outlined in the methodology, which involves calculating Tmax based on various parameters such as the height of the wall, the lateral earth pressure coefficient, and the",
+    "source": "graph",
+    "confidence": 0.95
+  },
+  {
+    "request_id": "2ff91d05-22cd-4102-937c-2a447e4184cf",
+    "time": "2026-04-23 22:55:33.819867",
+    "question": "what is NEPA",
+    "answer": "\n1. **Final Answer**: The National Environmental Policy Act (NEPA) is a federal law enacted in 1969 that requires federal agencies to assess the environmental effects of their proposed actions before making decisions. It aims to promote harmony between humans and the environment, prevent environment",
+    "source": "graph",
+    "confidence": 0.01
+  },
+  {
+    "request_id": "9d2b05de-d452-467d-bb01-98b4afc999c8",
+    "time": "2026-04-23 22:56:11.631493",
+    "question": "Please provide FHWA Office  table",
+    "answer": "\n\ud83d\udcca Graph-Based Answer:\n\n1. Clear Answer: No FHWA Office table data is available.\n\n2. Key Facts:\n   - No matching data found in the provided graph data.\n   - No specific information regarding FHWA Office is available.\n\n3. Short Explanation: The request for the FHWA Office table cannot be fulfilled as",
+    "source": "graph",
+    "confidence": 0.26
+  },
+  {
+    "request_id": "0c0b0981-62dd-4df8-8cfb-0468a5cfef8b",
+    "time": "2026-04-23 22:57:35.257417",
+    "question": "what is environmental impact Assessment process under NAPA",
+    "answer": "\n### 1. Final Answer\nThe Environmental Impact Assessment (EIA) process under the National Environmental Policy Act (NEPA) involves a series of steps to evaluate the potential environmental effects of proposed federal actions. This process includes determining the level of documentation required, con",
+    "source": "graph",
+    "confidence": 0.95
+  },
+  {
+    "request_id": "618ea12b-6526-43ff-9d8a-52d6bfe8c4ad",
+    "time": "2026-04-24 08:05:38.754727",
+    "question": "What is the  regulatory framework in NAPA",
+    "answer": "\n1. **Final Answer**: The regulatory framework in Napa, California, is governed by a combination of federal, state, and local environmental laws and regulations aimed at protecting air quality, water resources, and noise control. Key federal statutes include the Clean Air Act (CAA), Clean Water Act ",
+    "source": "graph",
+    "confidence": 0.01
+  },
+  {
+    "request_id": "43a9601d-f13a-4fb6-85cb-cf20099f5bdc",
+    "time": "2026-04-24 08:09:31.117076",
+    "question": "what is fog and chip sealing",
+    "answer": "\n1. **Final Answer**  \nFog sealing and chip sealing are two methods of pavement preservation used to extend the life of asphalt surfaces.\n\n2. **Technical Explanation**  \n   - **Fog Sealing**: This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. The purpose of fog ",
+    "source": "graph",
+    "confidence": 0.0
+  },
+  {
+    "request_id": "6b4dcf24-4526-48b4-a5bc-42c35bb2c9c0",
+    "time": "2026-04-24 13:24:36.223847",
+    "question": "What is Torque requirement",
+    "answer": "1. **Final Answer**: The torque requirement refers to the amount of force applied when tightening a nut onto a bolt, which ensures that the sign assembly remains intact under normal environmental loadings and separates correctly upon impact.\n\n2. **Technical Explanation**: Torque is a measure of the ",
+    "source": "graph",
+    "confidence": 0.01
+  },
+  {
+    "request_id": "fa382390-c2bf-48c5-a722-60cc9b594217",
+    "time": "2026-04-24 23:37:22.740996",
+    "question": "what is fog and chip sealing",
+    "answer": "**Final Answer:**\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\n**Technical Explanation:**\n- **Fog Sealing:** This method involves applying a thin layer of asphalt emulsion to the surface of an existing pavement. T",
+    "source": "graph",
+    "confidence": 0.0
+  },
+  {
+    "request_id": "b5c60dd9-f134-4743-86f1-ce89aa53ceb4",
+    "time": "2026-04-25 11:13:45.965558",
+    "question": "what is fog and chip sealing",
+    "answer": "**Final Answer:**\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\n**Technical Explanation:**\n- **Fog Sealing:** This method involves applying a thin layer of asphalt emulsion to the surface of an existing pavement. T",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "6f4123ad-e995-49ff-8590-141c04789a31",
+    "time": "2026-04-25 12:28:14.460259",
+    "question": "What is Torque requirement",
+    "answer": "**Final Answer:**\nNo specific torque requirement data is available.\n\n**Technical Explanation:**\nTorque requirement refers to the amount of rotational force needed to achieve a specific outcome, such as securing bolts or ensuring the proper functioning of mechanical systems. In civil engineering, tor",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "2fe09d7f-0cba-46d5-8234-71484333445f",
+    "time": "2026-04-25 14:03:34.844586",
+    "question": "What is Torque requirement",
+    "answer": "No specific torque requirement data is available.",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "c9e97724-2f65-46e7-b1d4-090e35c7a509",
+    "time": "2026-04-25 15:34:09.029334",
+    "question": "What is Torque requirement",
+    "answer": "The provided documents do not contain specific information regarding torque requirements. If you have any other questions or need information on a different topic, please let me know!",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "7052d383-3040-4d8d-98ff-8e1dc0ee30b1",
+    "time": "2026-04-25 15:34:42.005049",
+    "question": "what is fog and chip sealing",
+    "answer": "The provided documents do not contain information specifically about fog sealing. However, they do describe chip sealing.\n\n**Chip Sealing:** Chip seals involve applying a layer of asphalt followed by a layer of aggregate (chips) to create a durable surface that enhances skid resistance and protects ",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "0066e344-9334-4013-aa32-ddbc2d807a0b",
+    "time": "2026-04-25 20:55:35.362078",
+    "question": "what is fog and chip sealing",
+    "answer": "**Final Answer:**\n\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\n1. **Fog Sealing:** This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. It serves to seal and enrich the surface",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "d18223f6-3a6d-4ca7-bc39-f9a74be741b3",
+    "time": "2026-04-25 21:16:04.489819",
+    "question": "Please find the output as below after changing engineeringagent.py\n\nwhat is fog and chip sealing\n\n\ud83d\udca1 Answer\nFinal Answer:\n\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\nFog Sealing: This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. It serves to seal and enrich the surface, close up hairline cracks, and prevent oxidation and raveling. Fog seals are typically used on low-volume, low-speed roadways and should be applied to dry, clean pavements when temperatures are warm or hot. The emulsion requires a cure time of up to 3 hours, and fog seals can last as long as 3 years (Document 1, Page 320).\n\nChip Sealing: This process consists of spraying a polymer-modified asphalt binder onto the pavement, which is then immediately covered with washed limestone, dolomite aggregate, or trap rock. The aggregate is rolled into the binder to ensure retention. Chip seals are intended to provide a new wearing surface, eliminate raveling, retard oxidation, reduce water intrusion, and improve surface friction. They are generally applied to structurally sound pavements and can be used on roadways with average daily traffic levels as high as 30,000. Chip seals require careful preparation of the existing pavement, including repairs to cracks and potholes, and should not be placed in cool weather (Document 2, Page 321).\n\nTechnical Explanation:\n\nFog Sealing is primarily a rejuvenation technique that enhances the existing pavement's surface by sealing it against moisture and environmental damage. It is effective for maintaining the integrity of low-traffic roadways and is best applied under warm conditions to ensure proper curing.\n\nChip Sealing, on the other hand, is a more robust treatment that not only seals the pavement but also provides a new surface layer that improves traction and durability. It is suitable for a wider range of traffic conditions but requires thorough preparation of the existing pavement to ensure effectiveness.\n\nConfidence: 1\n\n\ud83d\udcda Sources\n[1] data\\Highway Engineering Handbook 3rd Editionbb.pdf (Page 320)\n\n[2] data\\Highway Engineering Handbook 3rd Editionbb.pdf (Page 321)\n\n\ud83d\udcca Confidence\nRAG: 0.0 | Graph: 0.36\n\nIt seems answer is almost correct. I compare the answer with pdf file \nthe difference is page no. It is not correct. it should be 303 and 304\nRAG confidence is 0.0\n\ngraph confidence is 0.36\n\nPrint output is as below:\n\n\ud83e\udde0 Question: what is fog and chip sealing\n2026-04-25 20:55:22,038 | INFO | backend.src.orchestration.router | \u26a1 Fast classify \u2192 intent=rag, confidence=0.00\n2026-04-25 20:55:23,732 | INFO | backend.src.orchestration.router | \ud83e\udde0 LLM classify \u2192 rag\n\u27a1\ufe0f Intent: rag\n2026-04-25 20:55:23,733 | INFO | backend.src.agents.engineering_agent | \u2699\ufe0f EngineeringAgent running\n2026-04-25 20:55:25,191 | INFO | backend.src.agents.engineering_agent | Query: What are the definitions and applications of fog sealing and chip sealing in road maintenance? what is fog and chip sealing\n2026-04-25 20:55:27,220 | INFO | backend.src.agents.engineering_agent | Top doc metadata: {'source': 'data\\\\Highway Engineering Handbook 3rd Editionbb.pdf', 'section': None, 'clause': None, 'clauses': [], 'producer': 'Acrobat Distiller 9.0.0 (Windows)', 'creator': 'QuarkXPress: pictwpstops filter 1.0', 'creationdate': '2009-07-13T13:33:24-04:00', 'author': 'Admin', 'moddate': '2009-07-13T13:50:28-04:00', 'title': '0071597638.pdf', 'total_pages': 889, 'page': 319, 'page_label': '320', 'parser': 'pypdf'}\n2026-04-25 20:55:27,220 | INFO | backend.src.agents.engineering_agent | Top doc preview: Where crack sealing is not a suitable method of preventive maintenance, other forms of\npavement preservation should be considered. Table 3.28 is provided for quantity esti-\nmation. The table is based on a unit material weight of 63 lb/ft 3 (1000 kg/m 3), and\ndoes not account for waste or spillage. T\n2026-04-25 20:55:27,220 | INFO | backend.src.agents.engineering_agent | ======== CONTEXT DEBUG ========\n2026-04-25 20:55:27,221 | INFO | backend.src.agents.engineering_agent | \nDOC 1:\nWhere crack sealing is not a suitable method of preventive maintenance, other forms of\npavement preservation should be considered. Table 3.28 is provided for quantity esti-\nmation. The table is based on a unit material weight of 63 lb/ft 3 (1000 kg/m 3), and\ndoes not account for waste or spillage. This table is applicable for crack sealing materi-\nals meeting the requirements of ASTM D-6690.\nMaintenance of traffic is required to apply the sealant and allow it to cure. Cure time\nis usually less than 1 h. Crack sealing operations are most effective when pavement\ntemperatures are cool to cold. As pavements cool they contract, and thus widen the\ncracks, allowing more sealant to enter the pavement. Crack sealing should not be done\non wet or damp pavements and should be applied on pavements when\n2026-04-25 20:55:27,221 | INFO | backend.src.agents.engineering_agent | \nDOC 2:\npneumatic roller. The binder is applied by an approved bituminous distributor, and the\naggregate placed by an approved aggregate spreader. The rolling operation is intended to\nseat the aggregate into the binder and ensure chip retention. Chip seals can be placed\nas single or double applications, depending on pavement condition. Chip seal is most\ngenerally applied to low-volume roadways, but has been applied to roadways with\naverage daily traffic levels (ADTs) as high as 30,000. Chip seals are intended to pro-\nvide a new wearing surface as well as to eliminate raveling, retard oxidation, reduce\nthe intrusion of water, improve surface friction, and seal cracks.\nChip seals should only be applied to pavements that are structurally sound and suit-\nable for preventive maintenance. The following \n2026-04-25 20:55:27,221 | INFO | backend.src.agents.engineering_agent | ================================\n2026-04-25 20:55:27,222 | INFO | backend.src.agents.graph_agent | \ud83d\udcca GraphAgent running...\n2026-04-25 20:55:27,222 | INFO | backend.src.graph_rag.graph_query | \ud83d\udcca GraphQueryEngine running...\n2026-04-25 20:55:27,255 | INFO | backend.src.graph_rag.graph_query | Extracted \u2192 material=None, location=None\n2026-04-25 20:55:27,256 | INFO | backend.src.agents.graph_agent | \ud83d\udcca Graph Confidence: 0.36\n2026-04-25 20:55:30,117 | INFO | backend.src.agents.engineering_agent | RAG: 0.0 | GRAPH: 0.36\n2026-04-25 20:55:30,118 | INFO | backend.src.agents.engineering_agent | \nPROMPT:\n\nYou are a senior civil engineer.\n\nSTRICT RULES:\n1. Use ONLY the provided documents\n2. If information exists, you MUST include it\n3. Do NOT say \"not available\" if data is present\n4. Combine multiple sections if needed\n5. ALWAYS cite sources like (Document 1, Page X)\n\nDocuments:\n\n--- DOCUMENT 1 ---\nSource: Highway Engineering Handbook 3rd Editionbb.pdf\nPage: 320\n\nContent:\nWhere crack sealing is not a suitable method of preventive maintenance, other forms of\npavement preservation should be considered. Table 3.28 is provided for quantity esti-\nmation. The table is based on a unit material weight of 63 lb/ft 3 (1000 kg/m 3), and\ndoes not account for waste or spillage. This table is applicable for crack sealing materi-\nals meeting the requirements of ASTM D-6690.\nMaintenance of traffic is required to apply the sealant and allow it to cure. Cure time\nis usually less than 1 h. Crack sealing operations are most effective when pavement\ntemperatures are cool to cold. As pavements cool they contract, and thus widen the\ncracks, allowing more sealant to enter the pavement. Crack sealing should not be done\non wet or damp pavements and should be applied on pavements when both surface\ntemperature and ambient air temperature are above 40\u00b0F (4\u00b0C).\nCrack sealing will have little effect on the current pavement condition. The intent\nof crack sealing is to slow the rate of deterioration and prolong pavement life. Crack\nsealants are expected to last 2 to 3 years before reapplication is necessary.\n3\n2026-04-25 20:55:35,360 | INFO | backend.src.agents.engineering_agent | \nLLM RESPONSE:\n**Final Answer:**\n\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\n1. **Fog Sealing:** This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. It serves to seal and enrich the surface, close up hairline cracks, and prevent oxidation and raveling. Fog seals are typically used on low-volume, low-speed roadways and should be applied to dry, clean pavements when temperatures are warm or hot. The emulsion requires a cure time of up to 3 hours, and fog seals can last as long as 3 years (Document 1, Page 320).\n\n2. **Chip Sealing:** This process consists of spraying a polymer-modified asphalt binder onto the pavement, which is then immediately covered with washed limestone, dolomite aggregate, or trap rock. The aggregate is rolled into the binder to ensure retention. Chip seals are intended to provide a new wearing surface, eliminate raveling, retard oxidation, reduce water intrusion, and improve surface friction. They are generally applied to structurally sound pavements and can be used on roadways with average daily traffic levels as high as 30,000. Chip seals require careful preparation of the existing pavement, including repairs to cracks and potholes, and should not be placed in cool weather (Document 2, Page 321).\n\n**Technical Explanation:**\n- **Fog Sealing** is primarily a rejuvenation technique that enhances the existing pavement's surface by sealing it against moisture and environmental damage. It is effective for maintaining the integrity of low-traffic roadways and is best applied under warm conditions to ensure proper curing.\n  \n- **Chip Sealing**, on the other hand, is a more robust treatment that not only seals the pavement but also provides a new surface layer that improves traction and durability. It is suitable for a wider range of traffic conditions but requires thorough preparation of the existing pavement to ensure effectiveness.\n\n**Confidence:** 1\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+    "answer": "**Final Answer:**\n\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\n1. **Fog Sealing:** This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. It serves to seal and enrich the surface",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "af56d6c8-608b-4342-9b9c-f037c015434a",
+    "time": "2026-04-25 22:34:47.485305",
+    "question": "what is fog and chip sealing",
+    "answer": "**Final Answer:**\nFog sealing and chip sealing are two types of surface treatments used in road maintenance to extend the life of asphalt pavements.\n\n1. **Fog Sealing:** This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. It is used to seal and enrich the surface",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "85ab452a-4ac7-445e-a58c-51451c14bdca",
+    "time": "2026-04-25 22:39:05.830985",
+    "question": "what is fog and chip sealing",
+    "answer": "**Final Answer:**\nFog sealing and chip sealing are two methods used in road maintenance to extend the life of asphalt pavements.\n\n1. **Fog Sealing:** This method involves applying a diluted asphalt emulsion to a weathered asphalt surface. It serves to seal and enrich the surface, close up hairline c",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "d3d27743-5b13-4635-bcfc-d7fffe689434",
+    "time": "2026-04-25 22:40:44.017312",
+    "question": "What is Torque requirement",
+    "answer": "**Final Answer:**\nTorque requirements refer to the specifications for bolt tightness that must be adhered to in order to ensure that a sign assembly remains intact under normal environmental loadings and separates correctly upon impact. The torque is the amount of force used in tightening the nut to",
+    "source": "hybrid",
+    "confidence": 0.5
+  },
+  {
+    "request_id": "bf410431-386c-4417-8041-60f8bfcd746d",
+    "time": "2026-04-25 22:44:53.269077",
+    "question": "What is the  regulatory framework in NAPA",
+    "answer": "**Final Answer:**\nThe regulatory framework in NAPA (National Environmental Policy Act) is governed by several federal statutes and regulations aimed at protecting the environment, which include the Clean Air Act (CAA), the Noise Control Act (NCA), and the Clean Water Act (CWA). These acts establish ",
+    "source": "hybrid",
+    "confidence": 1.0
+  },
+  {
+    "request_id": "036a0e77-afb9-43bb-876a-0251972446f8",
+    "time": "2026-04-25 22:48:08.148128",
+    "question": "Sorry It is NEPA",
+    "answer": "**Final Answer:** The National Environmental Policy Act (NEPA) requires federal agencies to assess the environmental effects of their proposed actions before making decisions. This includes the need for an Environmental Impact Statement (EIS) for major federal actions, which is triggered by actions ",
+    "source": "hybrid",
+    "confidence": 0.5
   }
 ]

@@ -1,4 +1,3 @@
-from asyncio.log import logger
 from pathlib import Path
 from typing import List
 from langchain.schema import Document
@@ -17,9 +16,8 @@ from backend.src.utils.logger import get_logger
 
 import re
 
-from backend.src.utils.logger import get_logger
-
 logger = get_logger(__name__)
+
 
 class DocumentProcessor:
 
@@ -36,15 +34,17 @@ class DocumentProcessor:
 
         self.chunker = HierarchicalChunker()
 
-        # 🔥 Smart components
-        logger.info("Call parserRouter to load memory file parser_memory.json which store pypdf value")
+        # SMART COMPONENTS
+        logger.info("Initializing ParserRouter...")
         self.router = ParserRouter()
-        logger.info("ParserRouter initialized. Call internally _load to load file parser_router.json ")
+
+        logger.info("Initializing DocumentQualityScorer...")
         self.quality = DocumentQualityScorer()
-        logger.info("CacheManager initialized. Call internally _load to load file doc_cache.json which store pypdf value ")
+
+        logger.info("Initializing CacheManager...")
         self.cache = CacheManager()
 
-        # 🔥 Parsers
+        # PARSERS
         self.unstructured_parser = UnstructuredParser()
 
         if getattr(Config, "USE_AZURE_DOC_INTELLIGENCE", False):
@@ -53,11 +53,13 @@ class DocumentProcessor:
             self.azure_parser = None
 
     # =========================================================
-    # 🔥 PARSER EXECUTOR (IMPROVED)
+    # PARSER EXECUTION
     # =========================================================
     def _run_parser(self, parser, file_path):
 
         try:
+            logger.info(f"Running parser: {parser} on {file_path}")
+
             if parser == "pypdf":
                 loader = PyPDFLoader(file_path)
                 docs = loader.load()
@@ -71,42 +73,48 @@ class DocumentProcessor:
             else:
                 return None
 
-            # 🔥 Normalize metadata
-            for d in docs:
+            # 🔥 FIX: Ensure metadata consistency
+            for i, d in enumerate(docs):
                 d.metadata["parser"] = parser
                 d.metadata["source"] = file_path
+
+                # 🔥 IMPORTANT FIX FOR PAGE NUMBER
+                if "page" not in d.metadata:
+                    d.metadata["page"] = i + 1
 
             return docs
 
         except Exception as e:
-            logger.info(f"Parser {parser} failed: {e}")
+            logger.error(f"Parser {parser} failed: {e}")
             return None
 
+    # =========================================================
+    # SINGLE FILE LOAD (DO NOT REMOVE)
+    # =========================================================
     def load_single_document(self, file_path):
-        """
-        Load ONLY one document (used for upload)
-        """
 
-        from langchain_community.document_loaders import PyPDFLoader
+        logger.info(f"Loading single document: {file_path}")
 
         file_path = str(file_path)
-
-        # You can still use ParserRouter here if needed
         loader = PyPDFLoader(file_path)
-
         docs = loader.load()
+
+        # 🔥 Ensure metadata consistency
+        for i, d in enumerate(docs):
+            d.metadata["source"] = file_path
+            if "page" not in d.metadata:
+                d.metadata["page"] = i + 1
 
         return docs
 
     # =========================================================
-    # 🔥 LOAD DOCUMENTS (SMART PIPELINE)
+    # LOAD DOCUMENTS
     # =========================================================
     def load_documents(self, directory=None) -> List[Document]:
 
         if directory is None:
             base_dir = Path(__file__).resolve().parent.parent.parent
             directory = base_dir / "data"
-            logger.info(f"directory specified, defaulting to: {directory}")
 
         path = Path(directory)
         logger.info(f"Loading documents from: {path}")
@@ -118,76 +126,59 @@ class DocumentProcessor:
         docs = []
 
         for file in path.glob("*.pdf"):
-            
+
             file_path = str(file)
-            logger.info("\n Processing: {file_path}")
-        
-            # =====================================================
-            # 🔥 STEP 1: CACHE CHECK
-            # =====================================================
+            logger.info(f"\n📄 Processing: {file_path}")
+
+            # CACHE CHECK
             cached_parser = self.cache.get(file_path)
-            logger.info(f"Cache check for {file_path}: {'HIT' if cached_parser else 'MISS'}")
 
             if cached_parser:
-                logger.info(f"Using cached parser: {cached_parser}")
+                logger.info(f"Cache HIT → {cached_parser}")
 
                 parsed_docs = self._run_parser(cached_parser, file_path)
-                logger.info(f"Cached parser {cached_parser} returned {len(parsed_docs) if parsed_docs else 0} docs for file {file_path} ")
 
                 if parsed_docs:
                     docs.extend(parsed_docs)
                     continue
 
-            # =====================================================
-            # 🔥 STEP 2: GET PARSER ORDER
-            # =====================================================
+            # PARSER ORDER
             parser_order = self.router.get_parser_order(file_path)
 
             best_docs = None
             best_score = 0
             best_parser = None
 
-            # =====================================================
-            # 🔥 STEP 3: TRY MULTIPLE PARSERS
-            # =====================================================
             for parser in parser_order:
-
-                logger.info(f"Trying: {parser}")
 
                 parsed_docs = self._run_parser(parser, file_path)
 
                 if not parsed_docs:
                     continue
 
-                # 🔥 QUALITY SCORING (VERY IMPORTANT)
                 score = self.quality.score(parsed_docs)
-
-                logger.info(f"Score ({parser}): {score:.2f}")
+                logger.info(f"{parser} score: {score:.2f}")
 
                 if score > best_score:
                     best_docs = parsed_docs
                     best_score = score
                     best_parser = parser
 
-                # 🔥 EARLY EXIT (performance + cost saving)
                 if score > 0.85:
-                    logger.info(" High quality achieved, stopping early")
                     break
 
-            # =====================================================
-            # 🔥 STEP 4: LEARN + CACHE
-            # =====================================================
+            # SAVE LEARNING
             if best_parser:
                 self.router.update_learning(file_path, best_parser)
                 self.cache.set(file_path, best_parser)
 
             docs.extend(best_docs or [])
 
-        logger.info(f"\n Total documents loaded: {len(docs)}")
+        logger.info(f"✅ Total documents loaded: {len(docs)}")
         return docs
 
     # =========================================================
-    # 🔥 STRUCTURE DETECTION
+    # STRUCTURE DETECTION
     # =========================================================
     def _has_structure(self, text):
 
@@ -202,7 +193,7 @@ class DocumentProcessor:
         return any(re.search(p, text, re.IGNORECASE) for p in patterns)
 
     # =========================================================
-    # 🔥 SPLIT DOCUMENTS
+    # SPLITTING (🔥 FIXED METADATA)
     # =========================================================
     def split_documents(self, docs: List[Document]) -> List[Document]:
 
@@ -211,66 +202,51 @@ class DocumentProcessor:
         for doc in docs:
 
             text = doc.page_content
-            source = doc.metadata.get("source", "unknown")
+            metadata = doc.metadata.copy()
 
-            # 🔥 TABLE
-            if doc.metadata.get("type") == "table":
+            # TABLE
+            if metadata.get("type") == "table":
 
                 chunks = self.splitter.split_text(text)
 
                 chunks = [
                     Document(
                         page_content=c,
-                        metadata={
-                            "source": source,
-                            "type": "table"
-                        }
+                        metadata=metadata  # 🔥 PRESERVE METADATA
                     )
                     for c in chunks
                 ]
 
-            # 🔥 LEGAL STRUCTURE
+            # STRUCTURED
             elif self._has_structure(text):
 
-                chunks = self.chunker.process(text, source)
+                chunks = self.chunker.process(text, metadata.get("source"))
 
-            # 🔥 DEFAULT
+                for c in chunks:
+                    c.metadata.update(metadata)
+
+            # DEFAULT
             else:
                 chunks = self.splitter.split_documents([doc])
 
+                for c in chunks:
+                    c.metadata.update(metadata)
+
             all_chunks.extend(chunks)
 
-        logger.info(f"Total chunks: {len(all_chunks)}")
-
+        logger.info(f"✅ Total chunks created: {len(all_chunks)}")
         return all_chunks
 
     # =========================================================
-    # 🔥 MAIN PIPELINE
+    # MAIN PIPELINE
     # =========================================================
-    '''
-    def process(self, directory="data"):
-
-        docs = self.load_documents(directory)
-        chunks = self.split_documents(docs)
-
-        logger.info(f"Loaded {len(docs)} docs")
-        logger.info("Created {len(chunks)} chunks")
-
-        # 🔥 Optional graph integration
-        if hasattr(self, "graph_builder") and self.graph_builder:
-            logger.info(" Building Knowledge Graph...")
-            self.graph_builder.process_batch(chunks)
-
-        return chunks
-    '''
-
     def process(self, directory="data", return_raw=False):
 
         raw_docs = self.load_documents(directory)
         chunks = self.split_documents(raw_docs)
 
-        logger.info("Loaded {len(raw_docs)} docs")
-        logger.info("Created {len(chunks)} chunks")
+        logger.info(f"Loaded {len(raw_docs)} docs")
+        logger.info(f"Created {len(chunks)} chunks")
 
         if return_raw:
             return raw_docs, chunks

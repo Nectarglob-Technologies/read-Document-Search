@@ -7,24 +7,31 @@ class GraphStore:
 
         self.graph = nx.DiGraph()
 
-    def add_entity(self, name, entity_type):
+        # ✅ ADD THIS (CRITICAL FIX)
+        self.data = {}
 
+    # =========================================================
+    # ENTITY
+    # =========================================================
+    def add_entity(self, name, entity_type):
         self.graph.add_node(name, type=entity_type)
 
+    # =========================================================
+    # RELATION
+    # =========================================================
     def add_relation(self, source, relation, target):
-
         relation = relation.upper()
-
         self.graph.add_edge(source, target, relation=relation)
 
+    # =========================================================
+    # LOOKUPS
+    # =========================================================
     def get_projects_using_material(self, material):
 
         results = []
 
         for u, v, data in self.graph.edges(data=True):
-
             if data.get("relation") == "USES" and v.lower() == material.lower():
-
                 results.append(u)
 
         return results
@@ -34,9 +41,7 @@ class GraphStore:
         results = []
 
         for u, v, data in self.graph.edges(data=True):
-
             if data.get("relation") == "LOCATED_IN" and v.lower() == location.lower():
-
                 results.append(u)
 
         return results
@@ -46,9 +51,17 @@ class GraphStore:
         results = []
 
         for u, v, data in self.graph.edges(data=True):
-
             if data.get("relation") == "BUILT_BY" and v.lower() == contractor.lower():
-
                 results.append(u)
 
         return results
+
+    # =========================================================
+    # ENTITY FETCH
+    # =========================================================
+    def get_entities_by_type(self, entity_type):
+
+        return [
+            node for node, data in self.graph.nodes(data=True)
+            if data.get("type") == entity_type
+        ]

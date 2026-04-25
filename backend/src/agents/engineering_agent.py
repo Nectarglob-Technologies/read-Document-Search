@@ -1,264 +1,285 @@
+import difflib
+import hashlib
+import os
+import re
+
 from backend.src.retrieval.query_rewriter import QueryRewriter
 from backend.src.retrieval.hybrid_retriever import HybridRetriever
 from backend.src.retrieval.reranker import Reranker
 from backend.src.config.config import Config
-import difflib
-import re
+from backend.src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class EngineeringAgent:
 
-    def __init__(
-        self,
-        llm,
-        retriever,
-        graph_agent=None,
-        clause_store=None
-    ):
-
+    def __init__(self, llm, retriever, graph_agent=None, clause_store=None, memory=None):
         self.llm = llm
-
-        # ✅ EXISTING
         self.rewriter = QueryRewriter(llm)
         self.retriever = HybridRetriever(retriever)
         self.reranker = Reranker()
 
-        # ✅ NEW
         self.graph_agent = graph_agent
         self.clause_store = clause_store
+        self.memory = memory
 
-    # ---------------- CONFIDENCE ----------------
+        self.llm_cache = {}
+
+    # =========================================================
+    # 🔹 HASH
+    # =========================================================
+    def _get_hash(self, text):
+        return hashlib.md5(text.encode()).hexdigest()
+
+    # =========================================================
+    # 🔹 REAL PAGE FIX (🔥 CRITICAL)
+    # =========================================================
+    def _extract_real_page(self, text, fallback):
+        match = re.search(r"\b(\d{3})\b", text)
+        return match.group(1) if match else fallback
+
+    # =========================================================
+    # 🔹 CONFIDENCE (HYBRID 🔥)
+    # =========================================================
     def _calculate_confidence(self, query, docs):
 
         if not docs:
-            return 0
-
-        scores = []
-
-        for doc in docs:
-            similarity = difflib.SequenceMatcher(
-                None, query.lower(), doc.page_content.lower()
-            ).ratio()
-
-            scores.append(similarity)
-
-        return sum(scores) / len(scores)
-
-    # ---------------- GRAPH CONFIDENCE PARSER ----------------
-    def _extract_graph_confidence(self, text):
-
-        if not text:
             return 0.0
 
-        match = re.search(r"confidence[:\s]+(\d+\.?\d*)", text.lower())
+        keyword_scores = []
+        difflib_scores = []
 
-        if match:
-            try:
-                return float(match.group(1))
-            except:
-                return 0.6
+        keywords = [w.lower() for w in query.split() if len(w) > 3]
 
-        return 0.6
+        for doc in docs[:5]:
+            text = doc.page_content.lower()
 
-    # ---------------- CLAUSE RETRIEVAL ----------------
-    def _get_clause_context(self, question):
+            # keyword score
+            hits = sum(1 for k in keywords if k in text)
+            keyword_scores.append(hits / max(len(keywords), 1))
 
-        if not self.clause_store:
-            return []
+            # difflib score
+            difflib_scores.append(
+                difflib.SequenceMatcher(None, query.lower(), text).ratio()
+            )
 
-        return self.clause_store.search(question)
+        final_score = (
+            (sum(keyword_scores) / len(keyword_scores)) * 0.7 +
+            (sum(difflib_scores) / len(difflib_scores)) * 0.3
+        )
 
-    # ---------------- ZERO LLM ANSWER ----------------
-    def _extract_direct_answer(self, docs):
+        return round(final_score, 2)
 
-        best_doc = docs[0]
+    # =========================================================
+    # 🔹 MEMORY CONTEXT (RESTORED)
+    # =========================================================
+    def _get_memory_context(self, session_id):
 
-        return f"""
-            📄 Direct Answer (Fast Mode):
+        if not self.memory or not session_id:
+            return ""
 
-            {best_doc.page_content[:500]}
+        try:
+            summary = self.memory.get_summary(session_id)
+            recent = self.memory.get_recent_history(session_id, limit=5)
 
-            📌 Source: {best_doc.metadata.get("source", "unknown")}
+            text = ""
+            for msg in recent:
+                role = msg.get("role")
+                content = msg.get("content")
 
-            Confidence: 0.8
-            """
-    
-    def _boost_clause_docs(self, docs, question):
+                text += f"{role.capitalize()}: {content}\n"
 
-        if not docs:
-            return docs
+            return f"Summary:\n{summary}\n\nRecent:\n{text}"
 
-        boosted = []
+        except Exception as e:
+            logger.warning(f"Memory fallback: {e}")
+            return ""
+
+    # =========================================================
+    # 🔹 CONTEXT RANKING (IMPROVED 🔥)
+    # =========================================================
+    def _rank_context(self, question, docs, memory_context):
+
+        keywords = [w.lower() for w in question.split() if len(w) > 3]
+
+        ranked = []
 
         for doc in docs:
+            text = doc.page_content.lower()
 
             score = 0
 
-            # 🔥 Boost if clause metadata exists
+            # keyword boost
+            score += sum(1 for k in keywords if k in text) * 0.6
+
+            # memory boost
+            if memory_context:
+                score += difflib.SequenceMatcher(
+                    None, memory_context.lower(), text
+                ).ratio() * 0.2
+
+            # clause boost
             if "clauses" in doc.metadata:
                 score += 0.2
 
-            # 🔥 Boost if clause matches query
-            for clause in doc.metadata.get("clauses", []):
-                if clause in question:
-                    score += 0.3
+            ranked.append((doc, score))
 
-            boosted.append((doc, score))
+        ranked.sort(key=lambda x: x[1], reverse=True)
 
-        # sort by score
-        boosted.sort(key=lambda x: x[1], reverse=True)
+        return [d[0] for d in ranked]
 
-        return [d[0] for d in boosted]
+    # =========================================================
+    # 🔹 FORMAT SOURCE (FIXED)
+    # =========================================================
+    def _format_source(self, doc, idx):
 
+        file_name = os.path.basename(doc.metadata.get("source", "unknown"))
 
-    # ---------------- MAIN ----------------
-    def run(self, question):
+        raw_page = doc.metadata.get("page_label") or doc.metadata.get("page")
+        real_page = self._extract_real_page(doc.page_content, raw_page)
 
-        print("⚙️ EngineeringAgent running...")
+        return f"[{idx}] {file_name} (Page {real_page})"
 
-        # 🔥 STEP 1 — QUERY REWRITE
+    # =========================================================
+    # 🔹 MAIN
+    # =========================================================
+    def run(self, question, session_id=None):
+
+        logger.info("⚙️ EngineeringAgent running")
+
+        # ---------------- QUERY ----------------
         if Config.ZERO_LLM_MODE:
             improved_query = question
         else:
             try:
                 improved_query = self.rewriter.rewrite(question)
-            except:
+            except Exception as e:
+                logger.warning(f"Rewrite failed: {e}")
                 improved_query = question
 
-        # 🔥 STEP 2 — RETRIEVE
+        improved_query = f"{improved_query} {question}"
+
+        logger.info(f"Query: {improved_query}")
+
+        # ---------------- RETRIEVE ----------------
         docs = self.retriever.retrieve(improved_query)
 
-        # 🔥 STEP 3 — RERANK
+        # ---------------- RERANK ----------------
         top_docs = self.reranker.rerank(improved_query, docs)
 
-        # 🔥 STEP 3.5 — BOOST CLAUSE DOCS
-        top_docs = self._boost_clause_docs(top_docs, question)
+        # 🔥 MEMORY + RANKING
+        memory_context = self._get_memory_context(session_id)
+        top_docs = self._rank_context(question, top_docs, memory_context)
 
         if not top_docs:
-            return "No relevant documents found."
+            return {
+                "answer": "No relevant documents found.",
+                "docs": [],
+                "confidence": 0.0,
+                "rag_conf": 0.0,
+                "graph_conf": 0.0
+            }
 
-        # 🔥 STEP 4 — RAG CONFIDENCE
+        logger.info(f"Top doc metadata: {top_docs[0].metadata}")
+
+        # 🔥 DEBUG
+        logger.info("======== CONTEXT DEBUG ========")
+        for i, d in enumerate(top_docs[:3]):
+            logger.info(f"\nDOC {i+1}:\n{d.page_content[:800]}")
+        logger.info("================================")
+
+        # ---------------- CONFIDENCE ----------------
         rag_conf = self._calculate_confidence(improved_query, top_docs)
 
-        print(f"RAG Confidence: {rag_conf:.2f}")
-
-        # 🔥 STEP 5 — GRAPH
-        graph_ans = ""
+        # ---------------- GRAPH ----------------
+        graph_text = ""
         graph_conf = 0.0
 
         if self.graph_agent:
-            graph_ans = self.graph_agent.run(question)
-            graph_conf = self._extract_graph_confidence(graph_ans)
+            try:
+                g = self.graph_agent.run(question, session_id)
+                if isinstance(g, dict):
+                    graph_text = g.get("answer", "")
+                    graph_conf = g.get("confidence", 0.0)
+                else:
+                    graph_text = str(g)
+                    graph_conf = 0.5
+            except Exception as e:
+                logger.warning(f"GraphAgent failed: {e}")
 
-        print(f"Graph Confidence: {graph_conf:.2f}")
+        logger.info(f"RAG: {rag_conf} | GRAPH: {graph_conf}")
 
-        # 🔥 STEP 6 — CLAUSE CONTEXT
-        clause_context = self._get_clause_context(question)
-
-        # =========================================================
-        # 🔥 STEP 7 — FAST MODE (NO LLM)
-        # =========================================================
-        if (
-            Config.ZERO_LLM_MODE
-            or not Config.USE_LLM_FOR_ANSWER
-            or not self.llm
-        ):
-
-            # Prefer RAG if confident
-            if rag_conf >= Config.CONFIDENCE_THRESHOLD:
-                return self._extract_direct_answer(top_docs)
-
-            # Otherwise hybrid fallback
-            return f"""
-🔀 Hybrid Answer (Fast Mode)
-
-📊 Graph:
-{graph_ans}
-
-📄 Top Document:
-{top_docs[0].page_content[:300]}
-
-Confidence: {max(rag_conf, graph_conf):.2f}
-"""
-
-        # =========================================================
-        # 🔥 STEP 8 — HIGH CONFIDENCE → SKIP LLM
-        # =========================================================
-        if rag_conf >= Config.CONFIDENCE_THRESHOLD:
-            return self._extract_direct_answer(top_docs)
-
-        # =========================================================
-        # 🔥 STEP 9 — GRAPH DOMINANT
-        # =========================================================
-        if graph_conf > rag_conf + 0.2:
-            return f"""
-📊 Graph-Based Answer (High Confidence)
-
-{graph_ans}
-
-Confidence: {graph_conf:.2f}
-"""
-
-        # =========================================================
-        # 🔥 STEP 10 — PREPARE CONTEXT
-        # =========================================================
+        # =====================================================
+        # 🔥 CONTEXT BUILD (IMPROVED)
+        # =====================================================
         context = []
-        sources = []
-
         for i, doc in enumerate(top_docs[:5]):
-            source = doc.metadata.get("source", "unknown")
 
-            context.append(f"[{i+1}] {doc.page_content}")
-            sources.append(f"[{i+1}] {source}")
+            page = self._extract_real_page(
+                doc.page_content,
+                doc.metadata.get("page_label") or doc.metadata.get("page")
+            )
+
+            context.append(f"""
+--- DOCUMENT {i+1} ---
+Source: {os.path.basename(doc.metadata.get("source",""))}
+Page: {page}
+
+{doc.page_content}
+""")
 
         context_text = "\n\n".join(context)
 
-        # =========================================================
-        # 🔥 STEP 11 — HYBRID LLM (BEST QUALITY)
-        # =========================================================
+        # =====================================================
+        # 🔥 STRONG PROMPT (FINAL)
+        # =====================================================
         prompt = f"""
 You are a senior civil engineer.
 
-Use ALL sources below:
+STRICT RULES:
+1. Use ONLY the provided documents
+2. DO NOT ignore any relevant section
+3. If answer exists, DO NOT say "not available"
+4. Combine multiple documents if needed
+5. ALWAYS cite like (Document 1, Page X)
 
-------------------------
-Graph Data:
-{graph_ans}
-
-------------------------
-Clause Context:
-{clause_context}
-
-------------------------
 Documents:
 {context_text}
 
-------------------------
+Graph:
+{graph_text}
+
 Question:
 {question}
 
-------------------------
-
 Return:
-1. Final Answer
-2. Technical Explanation
-3. Referenced Clauses (if any)
-4. Sources
-5. Confidence: <0-1>
+- Final Answer (with citations)
+- Technical Explanation
+- Confidence (0 to 1)
 """
 
+        logger.info(f"\nPROMPT:\n{prompt[:1500]}")
+
+        # ---------------- LLM ----------------
         try:
             response = self.llm.invoke(prompt).content
         except Exception as e:
-            print("LLM failed, fallback:", e)
-            return self._extract_direct_answer(top_docs)
+            logger.error(f"LLM failed: {e}")
+            return {
+                "answer": top_docs[0].page_content,
+                "docs": top_docs[:5],
+                "confidence": rag_conf,
+                "rag_conf": rag_conf,
+                "graph_conf": graph_conf
+            }
 
-        return f"""
-{response}
+        logger.info(f"\nLLM RESPONSE:\n{response}")
 
-📊 RAG Confidence: {rag_conf:.2f}
-📊 Graph Confidence: {graph_conf:.2f}
-
-📚 Sources:
-{chr(10).join(sources)}
-"""
+        return {
+            "answer": response,
+            "docs": top_docs[:5],
+            "confidence": round(max(rag_conf, graph_conf), 2),
+            "rag_conf": rag_conf,
+            "graph_conf": graph_conf
+        }

@@ -5,13 +5,10 @@ from pathlib import Path
 from copy import deepcopy
 
 from backend.src.graph_rag.graph_builder import GraphBuilder
-
 from backend.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
-# 🔥 OPTIONAL (you can disable easily)
 USE_SEMANTIC_CHUNKING = False
 
 try:
@@ -24,16 +21,9 @@ class IngestionPipeline:
 
     def __init__(self, store, graph_file, llm):
 
-        # 🔹 FAISS store
         self.store = store
-
-        # 🔹 Graph file path
         self.graph_file = Path(graph_file)
-
-        # 🔹 LLM
         self.llm = llm
-
-        # 🔹 Load existing graph
         self.graph_store = self._load_graph()
 
     # =========================================================
@@ -57,23 +47,49 @@ class IngestionPipeline:
         logger.info("Graph saved")
 
     # =========================================================
-    # SAFE TEXT (TOKEN CONTROL)
+    # SAFE TEXT
     # =========================================================
     def _safe_text(self, text, max_chars=4000):
         return text[:max_chars] if text else ""
 
     # =========================================================
-    # 🔥 MAIN PIPELINE
+    # ✅ METADATA FIX (IMPORTANT)
+    # =========================================================
+    def _ensure_metadata(self, docs):
+
+        for i, doc in enumerate(docs):
+
+            if not hasattr(doc, "metadata") or doc.metadata is None:
+                doc.metadata = {}
+
+            # ✅ Ensure file name
+            if "source" not in doc.metadata:
+                doc.metadata["source"] = doc.metadata.get(
+                    "file_path",
+                    "Unknown_File"
+                )
+
+            # ✅ Ensure page number
+            if "page" not in doc.metadata:
+                doc.metadata["page"] = doc.metadata.get(
+                    "page_number",
+                    i + 1
+                )
+
+        return docs
+
+    # =========================================================
+    # MAIN INGEST
     # =========================================================
     def ingest(self, chunks, batch_size=50):
 
         if not chunks:
             return
 
-        logger.info("Total input chunks: {len(chunks)}")
+        logger.info(f"Total input chunks: {len(chunks)}")
 
         # =====================================================
-        # 🔥 STEP 1: OPTIONAL SEMANTIC CHUNKING
+        # STEP 1: OPTIONAL SEMANTIC CHUNKING
         # =====================================================
         if USE_SEMANTIC_CHUNKING and semantic_chunk_documents:
             logger.info("Applying semantic chunking...")
@@ -81,7 +97,12 @@ class IngestionPipeline:
             logger.info(f"After semantic chunking: {len(chunks)} chunks")
 
         # =====================================================
-        # 🔥 STEP 2: FAISS (SAFE BATCHING)
+        # ✅ APPLY METADATA FIX (GLOBAL)
+        # =====================================================
+        chunks = self._ensure_metadata(chunks)
+
+        # =====================================================
+        # STEP 2: FAISS
         # =====================================================
         for i in range(0, len(chunks), batch_size):
 
@@ -89,41 +110,43 @@ class IngestionPipeline:
 
             logger.info(f"FAISS Batch {i} → {i + len(batch)}")
 
-            # 🔹 IMPORTANT: don't modify original chunks
             safe_batch = deepcopy(batch)
 
-            # 🔹 TOKEN CONTROL (critical fix)
+            # ✅ APPLY METADATA HERE ALSO (SAFE)
+            safe_batch = self._ensure_metadata(safe_batch)
+
+            # TOKEN CONTROL
             for doc in safe_batch:
                 if hasattr(doc, "page_content"):
                     doc.page_content = self._safe_text(doc.page_content)
 
-            # 🔹 CREATE / ADD
+            # STORE
             if self.store.vectorstore:
                 self.store.add_documents(safe_batch)
             else:
                 self.store.create(safe_batch)
 
-        # 🔹 Save FAISS
+        # SAVE FAISS
         self.store.save()
 
         # =====================================================
-        # 🔥 STEP 3: GRAPH (FULL TEXT - NO TRIM)
+        # STEP 3: GRAPH
         # =====================================================
         logger.info("Processing graph...")
 
         graph_builder = GraphBuilder(self.llm)
 
-        # 🔹 Reuse existing graph
         if self.graph_store:
             logger.info("Updating existing graph...")
             graph_builder.store = self.graph_store
         else:
             logger.info("Creating new graph...")
 
-        # 🔹 IMPORTANT: use ORIGINAL chunks (not trimmed)
+        # ✅ APPLY METADATA BEFORE GRAPH
+        chunks = self._ensure_metadata(chunks)
+
         graph_builder.process_batch(chunks)
 
         self.graph_store = graph_builder.get_graph()
 
-        # 🔹 Save graph
         self._save_graph()

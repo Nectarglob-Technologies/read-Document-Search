@@ -1,94 +1,69 @@
 import re
 import json
 import os
-try:
-    from sentence_transformers import SentenceTransformer, util
-    EMBEDDING_AVAILABLE = True
-except:
-    EMBEDDING_AVAILABLE = False
+import numpy as np
+from backend.src.utils.logger import get_logger
 
+logger = get_logger(__name__)
 
 
 class GraphQueryEngine:
 
-    def __init__(self, graph_store):
+    def __init__(self, graph_store, memory=None, redis_client=None):
 
         self.graph = graph_store
+        self.memory = memory
+        self.redis = redis_client
 
-        # 🔥 Embedding model (FREE)
+        # 🔥 Load embedding model ONCE
+        from sentence_transformers import SentenceTransformer
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
-        # 🔥 Dynamic pattern store
+        # 🔥 FAISS DATA
+        self.materials = graph_store.data.get("materials", [])
+        self.locations = graph_store.data.get("locations", [])
+
+        self.material_index = graph_store.data.get("material_index")
+        self.location_index = graph_store.data.get("location_index")
+
+        # 🔥 Pattern learning
         self.pattern_file = "patterns.json"
-        self.patterns = self.load_patterns()
+        self.patterns = self._load_patterns()
 
-        # 🔥 Cache graph entities
-        self.materials = self._get_entities("material")
-        self.locations = self._get_entities("location")
+        logger.info("⚡ GraphQueryEngine ready (FAISS + Redis + Explainability)")
 
-        # Precompute embeddings
-        self.material_embeddings = self.model.encode(self.materials, convert_to_tensor=True)
-        self.location_embeddings = self.model.encode(self.locations, convert_to_tensor=True)
+    # =========================================================
+    # 🔥 REDIS CACHE
+    # =========================================================
+    def _cache_get(self, key):
+        if not self.redis:
+            return None
+        try:
+            data = self.redis.get(key)
+            return json.loads(data) if data else None
+        except:
+            return None
 
+    def _cache_set(self, key, value):
+        if not self.redis:
+            return
+        try:
+            self.redis.setex(key, 3600, json.dumps(value))
+        except:
+            pass
 
-    # ---------------- LOAD/SAVE PATTERNS ----------------
-    def load_patterns(self):
+    # =========================================================
+    # 🔥 PATTERN STORE
+    # =========================================================
+    def _load_patterns(self):
         if os.path.exists(self.pattern_file):
             return json.load(open(self.pattern_file))
         return {"materials": [], "locations": []}
 
-    def save_patterns(self):
+    def _save_patterns(self):
         json.dump(self.patterns, open(self.pattern_file, "w"), indent=2)
 
-
-    # ---------------- GRAPH ENTITY EXTRACTION ----------------
-    def _get_entities(self, entity_type):
-        return [
-            node for node, data in self.graph.graph.nodes(data=True)
-            if data.get("type") == entity_type
-        ]
-
-
-    # ---------------- 1️⃣ RULE-BASED ----------------
-    def extract_entity_rule(self, question):
-
-        material = None
-        location = None
-
-        # Static regex
-        mat_match = re.search(r"M\d+\s*Concrete", question, re.IGNORECASE)
-        if mat_match:
-            material = mat_match.group(0)
-
-        loc_match = re.search(
-            r"(Maharashtra|Mumbai|Delhi|Pune|Bangalore)",
-            question,
-            re.IGNORECASE
-        )
-        if loc_match:
-            location = loc_match.group(0)
-
-        return material, location
-
-
-    # ---------------- 2️⃣ DYNAMIC PATTERN ----------------
-    def extract_entity_dynamic(self, question):
-
-        material = None
-        location = None
-
-        for pattern in self.patterns["materials"]:
-            if pattern.lower() in question.lower():
-                material = pattern
-
-        for pattern in self.patterns["locations"]:
-            if pattern.lower() in question.lower():
-                location = pattern
-
-        return material, location
-
-
-    def learn_pattern(self, material, location):
+    def _learn_pattern(self, material, location):
         updated = False
 
         if material and material not in self.patterns["materials"]:
@@ -100,63 +75,149 @@ class GraphQueryEngine:
             updated = True
 
         if updated:
-            self.save_patterns()
+            self._save_patterns()
 
-
-    # ---------------- 3️⃣ EMBEDDING MATCHING ----------------
-    def extract_entity_embedding(self, question):
-
-        query_embedding = self.model.encode(question, convert_to_tensor=True)
+    # =========================================================
+    # 🔥 RULE-BASED EXTRACTION
+    # =========================================================
+    def _extract_rule(self, question):
 
         material = None
         location = None
 
-        # Material match
-        if len(self.materials) > 0:
-            scores = util.cos_sim(query_embedding, self.material_embeddings)[0]
-            best_idx = scores.argmax().item()
+        mat = re.search(r"M\d+\s*Concrete", question, re.IGNORECASE)
+        if mat:
+            material = mat.group(0)
 
-            if scores[best_idx] > 0.6:
-                material = self.materials[best_idx]
-
-        # Location match
-        if len(self.locations) > 0:
-            scores = util.cos_sim(query_embedding, self.location_embeddings)[0]
-            best_idx = scores.argmax().item()
-
-            if scores[best_idx] > 0.6:
-                location = self.locations[best_idx]
+        loc = re.search(
+            r"(Mumbai|Delhi|Pune|Bangalore|Maharashtra)",
+            question,
+            re.IGNORECASE
+        )
+        if loc:
+            location = loc.group(0)
 
         return material, location
 
+    # =========================================================
+    # 🔥 DYNAMIC PATTERN
+    # =========================================================
+    def _extract_dynamic(self, question):
 
-    # ---------------- MAIN QUERY ----------------
-    def query(self, question):
+        material = None
+        location = None
 
-        print("\n🔍 Step 1: Rule-based extraction")
-        material, location = self.extract_entity_rule(question)
+        for p in self.patterns["materials"]:
+            if p.lower() in question.lower():
+                material = p
 
-        if material or location:
-            print("✅ Rule-based success")
+        for p in self.patterns["locations"]:
+            if p.lower() in question.lower():
+                location = p
 
-        else:
-            print("⚠️ Rule failed → trying dynamic patterns")
-            material, location = self.extract_entity_dynamic(question)
+        return material, location
 
+    # =========================================================
+    # 🔥 FAISS SEARCH (CORE)
+    # =========================================================
+    def _search_faiss(self, index, items, query_vec):
+
+        if index is None or len(items) == 0:
+            return None
+
+        D, I = index.search(np.array([query_vec]), 1)
+
+        idx = I[0][0]
+
+        if idx < len(items):
+            return items[idx]
+
+        return None
+
+    # =========================================================
+    # 🔥 MAIN QUERY
+    # =========================================================
+    def query(self, question, session_id=None, rag_results=None):
+
+        logger.info("📊 GraphQueryEngine running...")
+
+        # =====================================================
+        # 🔥 CACHE
+        # =====================================================
+        cache_key = f"graph:{question}"
+
+        cached = self._cache_get(cache_key)
+        if cached:
+            logger.info("⚡ Cache hit")
+            return cached
+
+        # =====================================================
+        # 🔥 STEP 1: RULE
+        # =====================================================
+        material, location = self._extract_rule(question)
+
+        # =====================================================
+        # 🔥 STEP 2: PATTERN
+        # =====================================================
         if not material and not location:
-            print("⚠️ Dynamic failed → using embeddings")
-            material, location = self.extract_entity_embedding(question)
+            material, location = self._extract_dynamic(question)
+
+        # =====================================================
+        # 🔥 STEP 3: FAISS (MAIN ENGINE)
+        # =====================================================
+        if not material and not location:
+
+            q_vec = self.model.encode([question])[0].astype("float32")
+
+            material = self._search_faiss(
+                self.material_index,
+                self.materials,
+                q_vec
+            )
+
+            location = self._search_faiss(
+                self.location_index,
+                self.locations,
+                q_vec
+            )
+
+        logger.info(f"Extracted → material={material}, location={location}")
 
         # 🔥 Learn patterns automatically
-        self.learn_pattern(material, location)
+        self._learn_pattern(material, location)
 
-        print(f"📌 Extracted → Material: {material}, Location: {location}")
+        # =====================================================
+        # 🔥 GRAPH SCORING + EXPLAINABILITY
+        # =====================================================
+        scores = {}
+        explanations = {}
 
-        # Query graph
         if material:
-            return self.graph.get_projects_using_material(material)
+            for p in self.graph.get_projects_using_material(material):
+                scores[p] = scores.get(p, 0) + 2
+                explanations.setdefault(p, []).append(f"uses {material}")
 
         if location:
-            return self.graph.get_projects_by_location(location)
+            for p in self.graph.get_projects_by_location(location):
+                scores[p] = scores.get(p, 0) + 1
+                explanations.setdefault(p, []).append(f"located in {location}")
 
-        return ["No matching data found."]
+        # 🔥 HYBRID BOOST
+        if rag_results:
+            for r in rag_results:
+                scores[r] = scores.get(r, 0) + 1
+                explanations.setdefault(r, []).append("matched in documents")
+
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+        results = [
+            f"{p} → {', '.join(explanations.get(p, []))}"
+            for p, _ in ranked[:10]
+        ]
+
+        # =====================================================
+        # 🔥 CACHE STORE
+        # =====================================================
+        self._cache_set(cache_key, results)
+
+        return results if results else ["No matching data found."]
