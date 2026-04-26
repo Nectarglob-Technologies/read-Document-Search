@@ -36,7 +36,10 @@ class EngineeringAgent:
     # 🔹 REAL PAGE FIX (🔥 CRITICAL)
     # =========================================================
     def _extract_real_page(self, text, fallback):
+        #logger.info(f"Extraction text '{text}'")
         match = re.search(r"\b(\d{3})\b", text)
+        #logger.info(f"Extracting Match from text: '{match}'")
+        logger.info(f"Extracted page from text: {match.group(1) if match else 'None'} | Fallback: {fallback}")  
         return match.group(1) if match else fallback
 
     # =========================================================
@@ -89,6 +92,9 @@ class EngineeringAgent:
                 content = msg.get("content")
 
                 text += f"{role.capitalize()}: {content}\n"
+
+            logger.info(f"Memory summary: {summary}")
+            logger.info(f"Memory recent:\n{text}")
 
             return f"Summary:\n{summary}\n\nRecent:\n{text}"
 
@@ -181,12 +187,13 @@ class EngineeringAgent:
                 "graph_conf": 0.0
             }
 
-        logger.info(f"Top doc metadata: {top_docs[0].metadata}")
+       # logger.info(f"Top doc metadata: {top_docs[0].metadata}")
 
         # 🔥 DEBUG
         logger.info("======== CONTEXT DEBUG ========")
         for i, d in enumerate(top_docs[:3]):
-            logger.info(f"\nDOC {i+1}:\n{d.page_content[:800]}")
+            logger.info(f"-------------------------------------------")
+            #logger.info(f"\nDOC {i+1}:\n{d.page_content[:800]}")
         logger.info("================================")
 
         # ---------------- CONFIDENCE ----------------
@@ -215,12 +222,18 @@ class EngineeringAgent:
         # =====================================================
         context = []
         for i, doc in enumerate(top_docs[:5]):
-
+            '''
+            #the below code is commented  as it search the page no in whole text and it try to match first 3 digit which it match with any numerical value in text 
+            # and it return wrong page no. so we are using fallback page no which is extracted from metadata   
             page = self._extract_real_page(
                 doc.page_content,
                 doc.metadata.get("page_label") or doc.metadata.get("page")
             )
-
+            '''
+            
+            page = doc.metadata.get("page_label") or doc.metadata.get("page") or "Unknown"
+            logger.info(f"\nDOCNO {i+1} \n doc page: {page} \n doc metadata: {doc.metadata}")
+            
             context.append(f"""
 --- DOCUMENT {i+1} ---
 Source: {os.path.basename(doc.metadata.get("source",""))}
@@ -230,7 +243,7 @@ Page: {page}
 """)
 
         context_text = "\n\n".join(context)
-
+        
         # =====================================================
         # 🔥 STRONG PROMPT (FINAL)
         # =====================================================
