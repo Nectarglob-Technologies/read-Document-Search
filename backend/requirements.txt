@@ -51,3 +51,7 @@ pillow-heif
 pytesseract
 pdf2image
 pi-heif
+
+rank-bm25
+
+

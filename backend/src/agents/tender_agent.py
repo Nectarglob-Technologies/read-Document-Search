@@ -11,7 +11,7 @@ class TenderAgent:
         self.llm = llm
 
         # 🔥 Use RAG
-        self.retriever = HybridRetriever(retriever)
+        self.retriever = retriever
         self.reranker = Reranker()
 
         self.tool = TenderTool(llm)

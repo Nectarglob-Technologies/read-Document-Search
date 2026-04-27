@@ -1,33 +1,59 @@
-from backend.src.utils.logger import get_logger
-
-logger = get_logger(__name__)
+from rank_bm25 import BM25Okapi
+import numpy as np
 
 
 class HybridRetriever:
 
-    def __init__(self, vector_retriever, keyword_retriever=None):
+    def __init__(self, vectorstore, documents):
 
-        self.vector_retriever = vector_retriever
-        self.keyword_retriever = keyword_retriever
+        self.vectorstore = vectorstore
+        self.documents = documents
 
-    def retrieve(self, query, k=8):
+        # 🔥 Prepare BM25
+        self.tokenized_docs = [
+            doc.page_content.lower().split()
+            for doc in documents
+        ]
 
-        vector_docs = self.vector_retriever.invoke(query) or []
-        logger.info(f"Vector Retriever returned {len(vector_docs)} documents")
+        self.bm25 = BM25Okapi(self.tokenized_docs)
 
-        keyword_docs = []
-        if self.keyword_retriever:
-            keyword_docs = self.keyword_retriever.invoke(query) or []
-            logger.info(f"Keyword Retriever returned {len(keyword_docs)} documents")  
+        # weights (tunable)
+        self.faiss_weight = 0.7
+        self.bm25_weight = 0.3
 
-        # Merge results
-        combined = vector_docs + keyword_docs
-        logger.info(f"Combined documents: {len(combined)}")
+    # =========================================================
+    # 🔹 MAIN RETRIEVE
+    # =========================================================
+    def retrieve(self, query, top_k=10):
 
-        # Remove duplicates
-        unique_docs = {}
-        for doc in combined:
-            unique_docs[doc.page_content] = doc
+        # ---------------- FAISS ----------------
+        faiss_docs = self.vectorstore.similarity_search(query, k=top_k)
 
-        logger.info(f"Unique documents after merging: {len(unique_docs)}")
-        return list(unique_docs.values())[:k]
+        # ---------------- BM25 ----------------
+        tokenized_query = query.lower().split()
+        bm25_scores = self.bm25.get_scores(tokenized_query)
+
+        top_bm25_idx = np.argsort(bm25_scores)[::-1][:top_k]
+        bm25_docs = [self.documents[i] for i in top_bm25_idx]
+
+        # ---------------- MERGE ----------------
+        doc_scores = {}
+
+        # FAISS scoring
+        for rank, doc in enumerate(faiss_docs):
+            score = 1 / (rank + 1)
+            doc_scores[id(doc)] = doc_scores.get(id(doc), 0) + score * self.faiss_weight
+
+        # BM25 scoring
+        for rank, doc in enumerate(bm25_docs):
+            score = 1 / (rank + 1)
+            doc_scores[id(doc)] = doc_scores.get(id(doc), 0) + score * self.bm25_weight
+
+        # ---------------- SORT ----------------
+        doc_map = {id(doc): doc for doc in (faiss_docs + bm25_docs)}
+
+        ranked = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+
+        final_docs = [doc_map[i[0]] for i in ranked[:top_k]]
+
+        return final_docs

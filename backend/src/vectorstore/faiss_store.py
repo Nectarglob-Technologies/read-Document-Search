@@ -4,6 +4,8 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
+from backend.src.retrieval.hybrid_retriever import HybridRetriever
+
 
 from backend.src.utils.logger import get_logger
 
@@ -209,7 +211,7 @@ class FAISSStore:
         return False
 
     # =========================================================
-    # 🔎 RETRIEVER
+    # 🔎 Eearlier RETRIEVER
     # =========================================================
     def get_retriever(self):
 
@@ -217,3 +219,17 @@ class FAISSStore:
             raise ValueError("❌ FAISS not initialized")
 
         return self.vectorstore.as_retriever()
+    
+    
+    # =========================================================
+    # 🔎 NEW RETRIEVER (with FAISS + Full Docs)
+    # =========================================================
+    def get_retriever(self):
+
+        if self.vectorstore is None:
+            raise ValueError("FAISS not loaded")
+
+        # 🔥 get all documents from FAISS
+        docs = list(self.vectorstore.docstore._dict.values())
+
+        return HybridRetriever(self.vectorstore, docs)

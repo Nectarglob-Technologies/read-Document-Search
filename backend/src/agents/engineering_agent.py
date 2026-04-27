@@ -4,10 +4,14 @@ import os
 import re
 
 from backend.src.retrieval.query_rewriter import QueryRewriter
-from backend.src.retrieval.hybrid_retriever import HybridRetriever
+#from backend.src.retrieval.hybrid_retriever import HybridRetriever
 from backend.src.retrieval.reranker import Reranker
 from backend.src.config.config import Config
 from backend.src.utils.logger import get_logger
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+
 
 logger = get_logger(__name__)
 
@@ -15,9 +19,13 @@ logger = get_logger(__name__)
 class EngineeringAgent:
 
     def __init__(self, llm, retriever, graph_agent=None, clause_store=None, memory=None):
+        
+        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        
+
         self.llm = llm
         self.rewriter = QueryRewriter(llm)
-        self.retriever = HybridRetriever(retriever)
+        self.retriever = retriever #HybridRetriever(retriever)
         self.reranker = Reranker()
 
         self.graph_agent = graph_agent
@@ -31,9 +39,49 @@ class EngineeringAgent:
     # =========================================================
     def _get_hash(self, text):
         return hashlib.md5(text.encode()).hexdigest()
+    
+    def _get_doc_embedding(self, doc):
+
+        if "embedding" in doc.metadata:
+            return doc.metadata["embedding"]
+
+        emb = self.embedding_model.encode(doc.page_content)
+        doc.metadata["embedding"] = emb
+
+        return emb
+
+    
+    def _cosine_similarity(self, a, b):
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+    # =========================================================
+    # 🔹 MULTI-QUERY GENERATION (IMPROVED)  
+    # A single query often misses relevant docs.  
+    # Generating multiple query variants can boost recall before reranking.
+    # =========================================================
+
+    def _generate_multi_queries(self, question):
+        try:
+            prompt = f"""
+            Generate 3 different ways to ask the same question.
+
+            Question: {question}
+
+            Return only list.
+            """
+            response = self.llm.invoke(prompt).content
+
+            queries = [q.strip("- ").strip() for q in response.split("\n") if q.strip()]
+
+            return list(set([question] + queries))
+
+        except Exception as e:
+            logger.warning(f"Multi-query failed: {e}")
+            return [question]
 
     # =========================================================
     # 🔹 REAL PAGE FIX (🔥 CRITICAL)
+    #   We are not using this method to extract page no from text as it is not reliable, instead we are using fallback page no which is extracted from metadata.
     # =========================================================
     def _extract_real_page(self, text, fallback):
         #logger.info(f"Extraction text '{text}'")
@@ -43,8 +91,9 @@ class EngineeringAgent:
         return match.group(1) if match else fallback
 
     # =========================================================
-    # 🔹 CONFIDENCE (HYBRID 🔥)
+    # 🔹 CONFIDENCE 
     # =========================================================
+    '''
     def _calculate_confidence(self, query, docs):
 
         if not docs:
@@ -73,6 +122,28 @@ class EngineeringAgent:
         )
 
         return round(final_score, 2)
+    '''
+
+    # =========================================================
+    # 🔹 CONFIDENCE (EMBEDDING SIMILARITY)  
+    # =========================================================
+    def _calculate_confidence(self, query, docs):
+
+        if not docs:
+            return 0.0
+
+        query_emb = self.embedding_model.encode(query)
+
+        scores = []
+
+        for doc in docs[:5]:
+            doc_emb = self._get_doc_embedding(doc)
+
+            sim = self._cosine_similarity(query_emb, doc_emb)
+            scores.append(sim)
+
+        return round(float(sum(scores) / len(scores)), 2)
+
 
     # =========================================================
     # 🔹 MEMORY CONTEXT (RESTORED)
@@ -105,6 +176,7 @@ class EngineeringAgent:
     # =========================================================
     # 🔹 CONTEXT RANKING (IMPROVED 🔥)
     # =========================================================
+    '''
     def _rank_context(self, question, docs, memory_context):
 
         keywords = [w.lower() for w in question.split() if len(w) > 3]
@@ -134,6 +206,37 @@ class EngineeringAgent:
         ranked.sort(key=lambda x: x[1], reverse=True)
 
         return [d[0] for d in ranked]
+    '''
+    # ========================================================
+    # 🔹 CONTEXT RANKING (EMBEDDING SIMILARITY + MEMORY BOOST)
+    # =========================================================
+
+    def _rank_context(self, question, docs, memory_context):
+
+        query_emb = self.embedding_model.encode(question)
+
+        ranked = []
+
+        for doc in docs:
+            doc_emb = self._get_doc_embedding(doc)
+
+            score = self._cosine_similarity(query_emb, doc_emb)
+
+            # optional memory boost
+            if memory_context:
+                mem_emb = self.embedding_model.encode(memory_context)
+                score += self._cosine_similarity(mem_emb, doc_emb) * 0.2
+
+            # clause boost
+            if "clauses" in doc.metadata:
+                score += 0.1
+
+            ranked.append((doc, score))
+
+        ranked.sort(key=lambda x: x[1], reverse=True)
+
+        return [d[0] for d in ranked]
+
 
     # =========================================================
     # 🔹 FORMAT SOURCE (FIXED)
@@ -146,10 +249,280 @@ class EngineeringAgent:
         real_page = self._extract_real_page(doc.page_content, raw_page)
 
         return f"[{idx}] {file_name} (Page {real_page})"
+    
+    def _verify_answer(self, answer, docs):
+
+        context = " ".join([d.page_content for d in docs[:3]])
+
+        verify_prompt = f"""
+            Check if the answer is fully supported by context.
+
+            Answer:
+            {answer}
+
+            Context:
+            {context}
+
+            Return:
+            - VALID or INVALID
+            - Reason
+            """
+
+        try:
+            result = self.llm.invoke(verify_prompt).content
+
+            if "INVALID" in result.upper():
+                return False, result
+
+            return True, result
+
+        except:
+            return True, "Verification skipped"
+
+    def _strict_verify(self, answer, docs):
+
+        context_map = {
+            f"Document {i+1}": d.page_content
+            for i, d in enumerate(docs[:5])
+        }
+
+        prompt = f"""
+            You are a verification system.
+
+            Answer:
+            {answer}
+
+            Documents:
+            {context_map}
+
+            Task:
+            1. Break answer into sentences
+            2. For each sentence:
+            - Check if it is supported by ANY document
+            - Identify which document supports it
+            3. If ANY sentence is unsupported → mark INVALID
+
+            Return:
+            VALID or INVALID
+            Explain which sentences failed (if any)
+            """
+
+        try:
+            result = self.llm.invoke(prompt).content
+
+            if "INVALID" in result.upper():
+                return False, result
+
+            return True, result
+
+        except Exception as e:
+            return True, f"Verification skipped: {e}"
+
 
     # =========================================================
     # 🔹 MAIN
     # =========================================================
+
+    def run(self, question, session_id=None):
+
+        logger.info("⚙️ EngineeringAgent running")
+
+        # ---------------- QUERY REWRITE ----------------
+        if Config.ZERO_LLM_MODE:
+            improved_query = question
+        else:
+            try:
+                improved_query = self.rewriter.rewrite(question)
+            except Exception as e:
+                logger.warning(f"Rewrite failed: {e}")
+                improved_query = question
+
+        improved_query = f"{improved_query} {question}"
+
+        logger.info(f"Query: {improved_query}")
+
+        # =====================================================
+        # 🔥 MULTI QUERY GENERATION (NEW)
+        # =====================================================
+        queries = self._generate_multi_queries(improved_query)
+
+        logger.info(f"Generated Queries: {queries}")
+
+        # =====================================================
+        # 🔥 MULTI RETRIEVAL
+        # =====================================================
+        all_docs = []
+
+        for q in queries:
+            try:
+                docs = self.retriever.retrieve(q)
+                logger.info(f"Retrieved {len(docs)} docs for query: {q}")
+                all_docs.extend(docs)
+            except Exception as e:
+                logger.warning(f"Retrieval failed for query [{q}]: {e}")
+
+        if not all_docs:
+            return {
+                "answer": "No relevant documents found.",
+                "docs": [],
+                "confidence": 0.0,
+                "rag_conf": 0.0,
+                "graph_conf": 0.0
+            }
+
+        # =====================================================
+        # 🔥 DEDUPLICATION (CRITICAL)
+        # =====================================================
+        unique_docs = {}
+        for doc in all_docs:
+            key = doc.page_content[:200]  # lightweight unique key
+            if key not in unique_docs:
+                unique_docs[key] = doc
+
+        merged_docs = list(unique_docs.values())
+
+        logger.info(f"Total docs after dedup: {len(merged_docs)}")
+
+        # =====================================================
+        # 🔥 GLOBAL RERANK (CrossEncoder)
+        # =====================================================
+        top_docs = self.reranker.rerank(improved_query, merged_docs)
+
+        # =====================================================
+        # 🔥 MEMORY + CUSTOM RANK
+        # =====================================================
+        memory_context = self._get_memory_context(session_id)
+        top_docs = self._rank_context(question, top_docs, memory_context)
+
+        if not top_docs:
+            return {
+                "answer": "No relevant documents found.",
+                "docs": [],
+                "confidence": 0.0,
+                "rag_conf": 0.0,
+                "graph_conf": 0.0
+            }
+
+        # =====================================================
+        # 🔥 DEBUG LOG
+        # =====================================================
+        logger.info("======== CONTEXT DEBUG ========")
+        for i, d in enumerate(top_docs[:3]):
+            logger.info(f"DOC {i+1} preview: {d.page_content[:200]}")
+        logger.info("================================")
+
+        # =====================================================
+        # 🔥 CONFIDENCE
+        # =====================================================
+        rag_conf = self._calculate_confidence(improved_query, top_docs)
+
+        # =====================================================
+        # 🔥 GRAPH
+        # =====================================================
+        graph_text = ""
+        graph_conf = 0.0
+
+        if self.graph_agent:
+            try:
+                g = self.graph_agent.run(question, session_id)
+                if isinstance(g, dict):
+                    graph_text = g.get("answer", "")
+                    graph_conf = g.get("confidence", 0.0)
+                else:
+                    graph_text = str(g)
+                    graph_conf = 0.5
+            except Exception as e:
+                logger.warning(f"GraphAgent failed: {e}")
+
+        logger.info(f"RAG: {rag_conf} | GRAPH: {graph_conf}")
+
+        # =====================================================
+        # 🔥 CONTEXT BUILD
+        # =====================================================
+        context = []
+
+        for i, doc in enumerate(top_docs[:5]):
+
+            page = doc.metadata.get("page_label") or doc.metadata.get("page") or "Unknown"
+
+            context.append(f"""
+                --- DOCUMENT {i+1} ---
+                Source: {os.path.basename(doc.metadata.get("source",""))}
+                Page: {page}
+
+                {doc.page_content}
+                """)
+
+            context_text = "\n\n".join(context)
+
+            # =====================================================
+            # 🔥 STRONG PROMPT
+            # =====================================================
+            prompt = f"""
+                You are a senior civil engineer.
+
+                STRICT RULES:
+                1. Use ONLY the provided documents
+                2. DO NOT ignore any relevant section
+                3. DO NOT invent information
+                4. Every statement MUST be supported by text from the documents
+                5. ALWAYS cite like (Document 1, Page X)
+                6. If unsure → say "Not found in documents"
+
+                Documents:
+                {context_text}
+
+                Graph:
+                {graph_text}
+
+                Question:
+                {question}
+
+                Return:
+                - Final Answer (with citations)
+                - Technical Explanation
+                - Confidence (0 to 1)
+                - Supporting Evidence (exact lines)
+                """
+
+        logger.info(f"\nPROMPT:\n{prompt[:1500]}")
+
+        # =====================================================
+        # 🔥 LLM
+        # =====================================================
+        try:
+            response = self.llm.invoke(prompt).content
+
+            if rag_conf < 0.7:
+                is_valid, reason = self._strict_verify(response, top_docs)
+            else:
+                is_valid, reason = self._verify_answer(response, top_docs)
+
+            if not is_valid:
+                logger.warning("⚠️ Answer not grounded")
+
+        except Exception as e:
+            logger.error(f"LLM failed: {e}")
+            return {
+                "answer": top_docs[0].page_content,
+                "docs": top_docs[:5],
+                "confidence": rag_conf,
+                "rag_conf": rag_conf,
+                "graph_conf": graph_conf
+            }
+
+        logger.info(f"\nLLM RESPONSE:\n{response}")
+
+        return {
+            "answer": response,
+            "docs": top_docs[:5],
+            "confidence": round(max(rag_conf, graph_conf), 2),
+            "rag_conf": rag_conf,
+            "graph_conf": graph_conf
+        }
+
+
+    '''
     def run(self, question, session_id=None):
 
         logger.info("⚙️ EngineeringAgent running")
@@ -222,14 +595,14 @@ class EngineeringAgent:
         # =====================================================
         context = []
         for i, doc in enumerate(top_docs[:5]):
-            '''
+            
             #the below code is commented  as it search the page no in whole text and it try to match first 3 digit which it match with any numerical value in text 
             # and it return wrong page no. so we are using fallback page no which is extracted from metadata   
             page = self._extract_real_page(
                 doc.page_content,
                 doc.metadata.get("page_label") or doc.metadata.get("page")
             )
-            '''
+            
             
             page = doc.metadata.get("page_label") or doc.metadata.get("page") or "Unknown"
             logger.info(f"\nDOCNO {i+1} \n doc page: {page} \n doc metadata: {doc.metadata}")
@@ -248,35 +621,52 @@ Page: {page}
         # 🔥 STRONG PROMPT (FINAL)
         # =====================================================
         prompt = f"""
-You are a senior civil engineer.
+            You are a senior civil engineer.
 
-STRICT RULES:
-1. Use ONLY the provided documents
-2. DO NOT ignore any relevant section
-3. If answer exists, DO NOT say "not available"
-4. Combine multiple documents if needed
-5. ALWAYS cite like (Document 1, Page X)
+            STRICT RULES:
+            1. Use ONLY the provided documents
+            2. DO NOT ignore any relevant section
+            3. DO NOT invent information
+            4. Every statement MUST be supported by text from the documents
+            3. If answer exists, DO NOT say "not available"
+            4. Combine multiple documents if needed
+            5. ALWAYS cite like (Document 1, Page X)
+            6. If unsure → say "Not found in documents"
 
-Documents:
-{context_text}
+            Documents:
+            {context_text}
 
-Graph:
-{graph_text}
+            Graph:
+            {graph_text}
 
-Question:
-{question}
+            Question:
+            {question}
 
-Return:
-- Final Answer (with citations)
-- Technical Explanation
-- Confidence (0 to 1)
-"""
+            Return:
+            - Final Answer (with citations)
+            - Technical Explanation
+            - Confidence (0 to 1)
+            - Supporting Evidence (exact lines)
+            """
 
         logger.info(f"\nPROMPT:\n{prompt[:1500]}")
 
         # ---------------- LLM ----------------
         try:
             response = self.llm.invoke(prompt).content
+            is_valid, reason = self._verify_answer(response, top_docs)
+
+            if not is_valid:
+                logger.warning("⚠️ Answer not grounded. Using extractive fallback")
+
+                return {
+                    "answer": response,
+                    "docs": top_docs[:5],
+                    "confidence": round(max(rag_conf, graph_conf), 2),
+                    "rag_conf": rag_conf,
+                    "graph_conf": graph_conf
+                }
+
         except Exception as e:
             logger.error(f"LLM failed: {e}")
             return {
@@ -296,3 +686,4 @@ Return:
             "rag_conf": rag_conf,
             "graph_conf": graph_conf
         }
+    '''
