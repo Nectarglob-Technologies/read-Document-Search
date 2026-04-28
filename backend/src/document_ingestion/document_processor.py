@@ -46,11 +46,13 @@ class DocumentProcessor:
 
         # PARSERS
         self.unstructured_parser = UnstructuredParser()
+        logger.info("UnstructuredParser initialized")
 
         if getattr(Config, "USE_AZURE_DOC_INTELLIGENCE", False):
             self.azure_parser = AzureDocIntelligence()
         else:
             self.azure_parser = None
+        logger.info(f"AzureDocIntelligence initialized: {self.azure_parser}")
 
     # =========================================================
     # PARSER EXECUTION
@@ -93,17 +95,56 @@ class DocumentProcessor:
     # =========================================================
     def load_single_document(self, file_path):
 
+        docs = []
+
         logger.info(f"Loading single document: {file_path}")
 
         file_path = str(file_path)
-        loader = PyPDFLoader(file_path)
-        docs = loader.load()
+        logger.info(f"\n📄 Processing: {file_path}")
 
-        # 🔥 Ensure metadata consistency
-        for i, d in enumerate(docs):
-            d.metadata["source"] = file_path
-            if "page" not in d.metadata:
-                d.metadata["page"] = i + 1
+        # CACHE CHECK
+        cached_parser = self.cache.get(file_path)
+
+        if cached_parser:
+            logger.info(f"Cache HIT → {cached_parser}")
+
+            parsed_docs = self._run_parser(cached_parser, file_path)
+
+            if parsed_docs:
+                docs.extend(parsed_docs)
+                return docs
+
+        # PARSER ORDER
+        parser_order = self.router.get_parser_order(file_path)
+
+        best_docs = None
+        best_score = 0
+        best_parser = None
+
+        for parser in parser_order:
+
+            parsed_docs = self._run_parser(parser, file_path)
+
+            if not parsed_docs:
+                continue
+
+            score = self.quality.score(parsed_docs)
+            logger.info(f"{parser} score: {score:.2f}")
+
+            if score > best_score:
+                best_docs = parsed_docs
+                best_score = score
+                best_parser = parser
+
+            if score > 0.85:
+                break
+
+        # SAVE LEARNING
+        if best_parser:
+            self.router.update_learning(file_path, best_parser)
+            self.cache.set(file_path, best_parser)
+
+        docs.extend(best_docs or [])
 
         return docs
 

@@ -1,196 +1,302 @@
-"""Streamlit UI for Agentic RAG System - FINAL CLEAN VERSION"""
+"""🚀 FINAL STREAMLIT (STABLE + DEBUG + MEMORY + CHAT UI)"""
 
 import streamlit as st
 from pathlib import Path
 import sys
 import time
+import threading
+import uuid
 
-# Add backend src to path
-sys.path.append(str(Path(__file__).parent))
+from backend.src.utils.logger import get_logger
 
+logger = get_logger("streamlit")
+
+# =========================================================
+# PATH FIX
+# =========================================================
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.append(str(BASE_DIR))
+
+# =========================================================
+# IMPORTS
+# =========================================================
 from backend.src.config.config import Config
 from backend.src.document_ingestion.document_processor import DocumentProcessor
-from backend.src.vectorstore.vectorstore import VectorStore
+from backend.src.vectorstore.faiss_store import FAISSStore
+from backend.src.pipeline.ingestion_pipeline import IngestionPipeline
 
-# Page config
-st.set_page_config(
-    page_title="🤖 RAG Search",
-    page_icon="🔍",
-    layout="centered"
-)
+from backend.src.agents.engineering_agent import EngineeringAgent
+from backend.src.agents.weather_agent import WeatherAgent
+from backend.src.agents.tender_agent import TenderAgent
+from backend.src.agents.project_agent import ProjectAgent
+from backend.src.agents.graph_agent import GraphAgent
+from backend.src.agents.orchestrator_agent import OrchestratorAgent
 
-# Simple CSS
-st.markdown("""
-    <style>
-    .stButton > button {
-        width: 100%;
-        background-color: #4CAF50;
-        color: white;
-        font-weight: bold;
-    }
-    </style>
-""", unsafe_allow_html=True)
+from backend.src.graph_rag.graph_query import GraphQueryEngine
+from backend.src.memory.conversation_memory import ConversationMemory
+
+# =========================================================
+# CONFIG
+# =========================================================
+DATA_DIR = BASE_DIR / "data"
+GRAPH_FILE = BASE_DIR / "graph.pkl"
 
 
 # =========================================================
-# SESSION STATE
+# BACKGROUND INGESTION
 # =========================================================
-def init_session_state():
-    if 'retriever' not in st.session_state:
-        st.session_state.retriever = None
-    if 'llm' not in st.session_state:
-        st.session_state.llm = None
-    if 'initialized' not in st.session_state:
-        st.session_state.initialized = False
-    if 'history' not in st.session_state:
-        st.session_state.history = []
+def run_ingestion_in_background(pipeline, chunks):
+
+    def task():
+        logger.info("Background ingestion started...")
+        pipeline.ingest(chunks)
+        logger.info("Background ingestion completed")
+
+    thread = threading.Thread(target=task)
+    thread.start()
 
 
 # =========================================================
-# INITIALIZATION
+# SYSTEM INIT (DEBUG SAFE)
 # =========================================================
 @st.cache_resource
-def initialize_rag():
-    try:
-        # 🔹 LLM
-        llm = Config.get_llm()
+def initialize_system():
 
-        # 🔹 Document Processing
-        processor = DocumentProcessor(
-            chunk_size=Config.CHUNK_SIZE,
-            chunk_overlap=Config.CHUNK_OVERLAP
-        )
+    logger.info("🚀 Initializing system...")
 
-        documents = processor.process()
+    # STEP A: LLM
+    logger.info("STEP A: Loading LLM")
+    llm = Config.get_llm()
 
-        if not documents:
-            return None, None, 0
+    # STEP B: FAISS
+    logger.info("STEP B: Loading FAISS")
+    store = FAISSStore()
+    faiss_exists = store.load()
+    logger.info(f"FAISS exists: {faiss_exists}")
 
-        # 🔹 Vector Store
-        vector_store = VectorStore()
-        vector_store.create_vectorstore(documents)
+    # STEP C: Pipeline
+    logger.info("STEP C: Initializing pipeline")
+    pipeline = IngestionPipeline(store, GRAPH_FILE, llm)
 
-        retriever = vector_store.get_retriever()
+    # STEP D: First-time ingestion
+    if not faiss_exists or not getattr(pipeline, "graph_store", None):
 
-        return retriever, llm, len(documents)
+        logger.info("⚠️ Running ingestion (first time or missing graph)...")
 
-    except Exception as e:
-        st.error(f"❌ Failed to initialize: {str(e)}")
-        return None, None, 0
+        processor = DocumentProcessor()
+        raw_docs = processor.load_documents(DATA_DIR)
+        chunks = processor.split_documents(raw_docs)
 
+        logger.info(f"Chunks: {len(chunks)}")
 
-# =========================================================
-# SIMPLE RAG PIPELINE
-# =========================================================
-def run_rag(question, retriever, llm):
+        pipeline.ingest(chunks)
 
-    # 🔹 Retrieve docs
-    docs = retriever.get_relevant_documents(question)
+    graph_store = pipeline.graph_store
 
-    context = "\n\n".join([d.page_content for d in docs[:5]])
+    if graph_store is None:
+        raise Exception("❌ Graph store is None (ingestion failed)")
 
-    # 🔹 Prompt
-    prompt = f"""
-    Answer the question using only the context below.
+    retriever = store.get_retriever()
 
-    Context:
-    {context}
+    logger.info("STEP D: System core ready")
 
-    Question:
-    {question}
-    """
-
-    response = llm.invoke(prompt)
-
-    return {
-        "answer": response.content if hasattr(response, "content") else str(response),
-        "docs": docs
-    }
+    return llm, retriever, graph_store, store, pipeline
 
 
 # =========================================================
-# MAIN APP
+# BUILD AGENTS (SAFE)
+# =========================================================
+def build_agents(llm, retriever, graph_store, memory):
+
+    logger.info("⚙️ Building agents...")
+
+    query_engine = GraphQueryEngine(graph_store)
+
+    graph_agent = GraphAgent(llm, query_engine, memory=memory)
+
+    engineering = EngineeringAgent(
+        llm,
+        retriever,
+        graph_agent=graph_agent,
+        memory=memory
+    )
+
+    weather = WeatherAgent(llm)
+    tender = TenderAgent(llm, retriever)
+    project = ProjectAgent(graph_store)
+
+    orchestrator = OrchestratorAgent(
+        llm,
+        engineering,
+        weather,
+        tender,
+        project,
+        graph_agent,
+        memory
+    )
+
+    logger.info("✅ Agents Ready")
+
+    return orchestrator, graph_agent
+
+
+# =========================================================
+# SESSION INIT
+# =========================================================
+def initialize_session():
+
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+
+    if "memory" not in st.session_state:
+        st.session_state.memory = ConversationMemory()
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+
+# =========================================================
+# FILE UPLOAD
+# =========================================================
+def process_uploaded_file(uploaded_file, store, pipeline):
+
+    file_path = DATA_DIR / uploaded_file.name
+
+    if file_path.exists():
+        st.warning("⚠️ File already exists.")
+        return
+
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    st.success(f"📄 Uploaded: {uploaded_file.name}")
+
+    processor = DocumentProcessor()
+    raw_docs = processor.load_single_document(file_path)
+    chunks = processor.split_documents(raw_docs)
+
+    run_ingestion_in_background(pipeline, chunks)
+
+    st.info("⚡ Background ingestion started...")
+
+
+# =========================================================
+# MAIN UI
 # =========================================================
 def main():
 
-    init_session_state()
+    st.set_page_config(page_title="🤖 Agentic RAG", layout="centered")
+    st.title("🤖 Agentic RAG System")
 
-    st.title("🔍 RAG Document Search")
-    st.markdown("Ask questions about your documents")
+    DATA_DIR.mkdir(exist_ok=True)
 
-    # 🔹 Initialize
-    if not st.session_state.initialized:
+    # STEP 1: SESSION
+    initialize_session()
+    st.success("✅ STEP 1: Session Ready")
+
+    session_id = st.session_state.session_id
+    memory = st.session_state.memory
+
+    # STEP 2: SYSTEM INIT
+    try:
         with st.spinner("🚀 Initializing system..."):
+            llm, retriever, graph_store, store, pipeline = initialize_system()
 
-            retriever, llm, num_chunks = initialize_rag()
+        st.success("✅ STEP 2: System Ready")
 
-            if retriever:
-                st.session_state.retriever = retriever
-                st.session_state.llm = llm
-                st.session_state.initialized = True
+    except Exception as e:
+        st.error(f"❌ System init failed: {e}")
+        st.stop()
 
-                st.success(f"✅ System ready! ({num_chunks} chunks loaded)")
-            else:
-                st.warning("⚠️ No documents found. Please add PDFs to /data folder")
+    # DEBUG
+    st.write("📊 Graph Store:", "Loaded" if graph_store else "❌ None")
 
-    st.markdown("---")
-
-    # 🔹 Input
-    question = st.text_input(
-        "Enter your question:",
-        placeholder="Ask something about your documents..."
-    )
-
-    # 🔹 Search
-    if st.button("🔍 Search") and question:
-
-        if not st.session_state.retriever:
-            st.error("System not initialized properly")
-            return
-
-        with st.spinner("Searching..."):
-            start = time.time()
-
-            result = run_rag(
-                question,
-                st.session_state.retriever,
-                st.session_state.llm
+    # STEP 3: AGENTS
+    try:
+        with st.spinner("⚙️ Building agents..."):
+            orchestrator, graph_agent = build_agents(
+                llm, retriever, graph_store, memory
             )
 
-            elapsed = time.time() - start
+        st.success("✅ STEP 3: Agents Ready")
 
-        # 🔹 Store history
-        st.session_state.history.append({
-            "question": question,
-            "answer": result["answer"],
-            "time": elapsed
+    except Exception as e:
+        st.error(f"❌ Agent build failed: {e}")
+        st.stop()
+
+    st.success("🎯 STEP 4: UI Ready")
+
+    # =====================================================
+    # FILE UPLOAD
+    # =====================================================
+    with st.expander("📂 Upload Document"):
+        uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
+        if uploaded_file:
+            process_uploaded_file(uploaded_file, store, pipeline)
+
+    # =====================================================
+    # CHAT UI
+    # =====================================================
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # =====================================================
+    # USER INPUT
+    # =====================================================
+    if prompt := st.chat_input("Ask your question..."):
+
+        # USER
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt
         })
 
-        # 🔹 Answer
-        st.markdown("### 💡 Answer")
-        st.success(result["answer"])
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-        # 🔹 Sources
-        with st.expander("📄 Source Documents"):
-            for i, doc in enumerate(result["docs"], 1):
-                st.text_area(
-                    f"Document {i}",
-                    doc.page_content[:300] + "...",
-                    height=100
-                )
+        # AI
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
 
-        st.caption(f"⏱️ Response time: {elapsed:.2f} sec")
+                start = time.time()
 
-    # 🔹 History
-    if st.session_state.history:
-        st.markdown("---")
-        st.markdown("### 📜 Recent Searches")
+                result = orchestrator.answer(prompt, session_id)
+                answer = result.get("answer", "No response")
 
-        for item in reversed(st.session_state.history[-3:]):
-            st.markdown(f"**Q:** {item['question']}")
-            st.markdown(f"**A:** {item['answer'][:200]}...")
-            st.caption(f"Time: {item['time']:.2f}s")
-            st.markdown("")
+                elapsed = time.time() - start
+
+                st.markdown(answer)
+                st.caption(f"⏱️ {elapsed:.2f}s | Confidence: {result.get('confidence')}")
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+    # =====================================================
+    # DEBUG PANEL
+    # =====================================================
+    with st.expander("🧠 Debug Info"):
+
+        st.write("Session ID:", session_id)
+
+        if st.button("Show Summary"):
+            st.write(memory.get_summary(session_id))
+
+        if st.button("Show Recent History"):
+            st.json(memory.get_recent_history(session_id))
+
+        if st.button("Clear Memory"):
+            memory.clear(session_id)
+            st.success("Memory cleared")
+
+    # =====================================================
+    # CLEAR CHAT
+    # =====================================================
+    if st.button("🧹 Clear Chat UI"):
+        st.session_state.messages = []
+        st.rerun()
 
 
 # =========================================================

@@ -1,3 +1,4 @@
 {
-  "general": "pypdf"
+  "general": "pypdf",
+  "contract": "pypdf"
 }

@@ -107,6 +107,34 @@ class GraphBuilder:
             return True
 
         return False
+    
+    # =====================================================
+    # 🔥 SAFE NORMALIZATION FUNCTION
+    # =====================================================
+    def _normalize_value(self,item):
+
+        # If already string → return
+        if isinstance(item, str):
+            return item.strip()
+
+        # If dict → extract best possible value
+        if isinstance(item, dict):
+
+            # 🔥 Priority extraction
+            return (
+                item.get("name") or
+                item.get("type") or
+                item.get("value") or
+                item.get("project") or
+                item.get("entity") or
+                str(item)   # fallback (never crash)
+            )
+
+        # fallback
+        return str(item)
+
+
+
 
     # =========================================================
     def process_document(self, text, metadata=None):
@@ -204,15 +232,47 @@ class GraphBuilder:
                         )
 
                     self.llm_cache[doc_hash] = llm_data
-
+                    print(f"LLM Cache Size: {len(self.llm_cache)}" )
                 except Exception as e:
                     logger.error(f"LLM failed: {e}")
                     llm_data = {}
 
             # MERGE
             for key in ["projects", "materials", "locations", "contractors"]:
-                data[key] = list(set(data.get(key, []) + llm_data.get(key, [])))
+                for item in llm_data.get(key, []):
+                    print(f"{key} →", type(item), item)
 
+            # =====================================================
+            # 🔥 SAFE MERGE (NO CRASH, NO DUPLICATES)
+            # =====================================================
+            for key in ["projects", "materials", "locations", "contractors"]:
+
+                merged = []
+                seen = set()
+
+                combined = data.get(key, []) + llm_data.get(key, [])
+
+                for item in combined:
+
+                    value = self._normalize_value(item)
+
+                    if not value:
+                        continue
+
+                    if value not in seen:
+                        seen.add(value)
+                        merged.append(value)
+
+                data[key] = merged
+
+            '''
+            for key in ["projects", "materials", "locations", "contractors"]:
+                print(f"Before merge key: {key}" )
+                print(f"Before merge {key}: {len(data.get(key, []))} | LLM: {len(llm_data.get(key, []))}")  
+                data[key] = list(set(data.get(key, []) + llm_data.get(key, [])))
+            '''
+
+            print(f"Before merge relations: {len(data.get('relations', []))} | LLM: {len(llm_data.get('relations', []))}")  
             data["relations"] = data.get("relations", []) + llm_data.get("relations", [])
 
         # =====================================================

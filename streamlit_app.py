@@ -2,6 +2,8 @@ import streamlit as st
 import uuid
 import time
 import os
+
+from transformers import pipeline
 from redis import Redis
 
 # ============================
@@ -155,8 +157,24 @@ def init_system():
 
     logger.info("✅ System ready")
 
-    return orchestrator
+    return orchestrator, store, pipeline
 
+# =========================================================
+# SESSION SETUP (🔥 IMPORTANT)
+# =========================================================
+def initialize_session():
+
+    # Unique user session
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+
+    # Memory per user
+    if "memory" not in st.session_state:
+        st.session_state.memory = ConversationMemory()
+
+    # Chat history UI (optional)
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
 # ============================
 # STREAM TEXT
@@ -174,67 +192,175 @@ def stream_text(text):
 
     return output
 
+# ============================
+# 📤 FILE UPLOAD HANDLER (INCREMENTAL)
+# ============================
+def handle_file_upload(pipeline):
+
+    st.markdown("## 📤 Upload Document")
+
+    # ============================
+    # 📁 FILE SELECT
+    # ============================
+    uploaded_file = st.file_uploader(
+        "Select PDF",
+        type=["pdf"],
+        key="file_uploader"
+    )
+
+    # Store file in session (IMPORTANT)
+    if uploaded_file:
+        st.session_state.selected_file = uploaded_file
+
+    # ============================
+    # ⬆️ UPLOAD BUTTON
+    # ============================
+    if st.button("🚀 Upload Document"):
+
+        if "selected_file" not in st.session_state:
+            st.warning("⚠️ Please select a file first")
+            return
+
+        file = st.session_state.selected_file
+
+        save_path = os.path.join("data", file.name)
+        logger.info(f"save file path: {save_path}, size: {file.size} bytes") 
+
+        # ============================
+        # 🔁 DUPLICATE CHECK
+        # ============================
+        if os.path.exists(save_path):
+            st.warning(f"⚠️ File already exists: {file.name}")
+            return
+
+        # ============================
+        # 💾 SAVE FILE
+        # ============================
+        with open(save_path, "wb") as f:
+            f.write(file.getbuffer())
+
+        st.success(f"📁 Saved: {file.name}")
+
+        # ============================
+        # 🔥 PROCESS FILE
+        # ============================
+        placeholder = st.empty()
+
+        with st.spinner("Processing & indexing..."):
+
+            try:
+                from backend.src.document_ingestion.document_processor import DocumentProcessor
+
+                processor = DocumentProcessor()
+
+                raw_docs  = processor.load_single_document(str(save_path))
+                chunks = processor.split_documents(raw_docs)
+
+                logger.info(f"✅ New chunks: {len(chunks)}")
+
+                if not chunks:
+                    placeholder.error("❌ No content extracted")
+                    return
+
+                # 🔥 BACKGROUND INGESTION
+                #run_ingestion_in_background(pipeline, chunks)
+
+                # Run incremental ingestion
+                pipeline.ingest(chunks)
+                
+                #st.info("⚡ Background ingestion started...")
+                placeholder.success("✅ Document uploaded & indexed (Incremental)")
+
+                # 🔥 VERY IMPORTANT
+                st.cache_resource.clear()
+
+                # clear selected file
+                del st.session_state.selected_file
+
+                st.rerun()
+
+            except Exception as e:
+                placeholder.error(f"❌ Error: {e}")
+
 
 # ============================
 # RESPONSE
 # ============================
 def render_response(result):
 
+    import streamlit as st
+    import os
+    import base64
+
     if not result:
         st.warning("No response generated.")
         return
 
-    # ----------------------------
-    # HANDLE BOTH FORMATS
-    # ----------------------------
     if isinstance(result, dict):
         answer = result.get("answer", "")
         docs = result.get("docs", [])
-        rag_conf = result.get("rag_conf", None)
-        graph_conf = result.get("graph_conf", None)
+        snippet = result.get("snippet", "")
     else:
         answer = result
         docs = []
-        rag_conf = None
-        graph_conf = None
+        snippet = ""
 
-    # ----------------------------
+    # =============================
     # ANSWER
-    # ----------------------------
-    st.markdown("### 💡 Answer")
-    stream_text(answer)
+    # =============================
+    st.markdown("## 💡 Answer")
+    st.write(answer)
 
-    # ----------------------------
-    # SOURCES (FIXED)
-    # ----------------------------
-    if docs:
-        st.markdown("### 📚 Sources")
+    # =============================
+    # SOURCES
+    # =============================
+    st.markdown("### 📚 Sources")
 
-        seen = set()
+    for i, doc in enumerate(docs):
 
-        for i, d in enumerate(docs):
-            src = d.metadata.get("source", "Unknown")
-            page = d.metadata.get("page_label") or d.metadata.get("page", "N/A")
+        file_path = doc.metadata.get("source")
+        logger.info(f"Source file path {i+1}: {file_path}")
+        file_name = os.path.basename(file_path)
+        logger.info(f"Source file name {i+1}: {file_name}")
+        page = doc.metadata.get("page_label") or doc.metadata.get("page") or 1
 
-            key = f"{src}-{page}"
-            if key in seen:
-                continue
-            seen.add(key)
+        if not file_path:
+            continue
 
-            st.markdown(f"**[{i+1}]** {src} (Page {page})")
+        try:
+            # 🔥 Convert PDF to base64
+            with open(file_path, "rb") as f:
+                base64_pdf = base64.b64encode(f.read()).decode("utf-8")
 
-    # ----------------------------
-    # CONFIDENCE (FIXED)
-    # ----------------------------
-    if rag_conf is not None:
-        st.markdown("### 📊 Confidence")
-        st.info(f"RAG: {rag_conf} | Graph: {graph_conf}")
+            pdf_url = f"data:application/pdf;base64,{base64_pdf}#page={page}"
 
-    # ----------------------------
-    # DEBUG
-    # ----------------------------
-    with st.expander("⚙️ Debug Info"):
-        st.write(result)
+            # 🔥 Clickable link (opens new tab)
+            st.markdown(
+                f"""
+                **[{i+1}] {file_name} (Page {page})**  
+                <a href="{pdf_url}" target="_blank">🔗 Open Document</a>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # =============================
+            # 🔍 SHOW MATCHED TEXT (HIGHLIGHT)
+            # =============================
+            if snippet:
+                text = doc.page_content.lower()
+                highlight = snippet.lower()
+
+                highlighted = text.replace(
+                    highlight,
+                    f"**:yellow[{highlight}]**"
+                )
+
+                st.markdown("🔍 Match Preview:")
+                st.write(highlighted[:500])
+
+        except Exception as e:
+            st.warning(f"Could not open {file_name}")
+
 
 
 # ============================
@@ -244,12 +370,20 @@ def main():
 
     st.set_page_config(layout="wide")
     st.title("🤖 Agentic RAG System")
+    st.markdown("Upload documents or ask questions")
 
     user_id = get_user()
     if not user_id:
         return
 
-    orchestrator = init_system()
+    orchestrator,store,pipeline = init_system()
+
+    if not orchestrator:
+        st.warning("⚠️ No documents found.")
+        return
+    
+    #upload single file with incremental indexing
+    handle_file_upload(pipeline)
 
     # ======================
     # SESSION STATE
@@ -346,6 +480,8 @@ def main():
     for m in messages:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
+
+
 
     # ======================
     # INPUT
