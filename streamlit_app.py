@@ -296,13 +296,14 @@ def render_response(result):
     # =============================
     # HELPERS
     # =============================
+    '''
     def clean_text(text):
         text = re.sub(r'\s+', ' ', text)
         text = re.sub(r'(\w)\s+(\w)', r'\1\2', text)
         return text.strip()
-
+    '''
     def get_snippet(text, query, window=200):
-        text = clean_text(text)
+        #text = clean_text(text)
         text_lower = text.lower()
 
         for word in query.lower().split():
@@ -351,7 +352,11 @@ def render_response(result):
     # ANSWER
     # =============================
     st.markdown("## 💡 Answer")
-    st.write(answer)
+    answer = answer.replace("###", "\n###")  # 🔥 fix formatting
+    st.markdown(answer)   # ✅ KEEP RAW FORMATTING
+
+    #st.markdown("## 💡 Answer")
+    #st.write(answer)
 
     # =============================
     # SOURCES

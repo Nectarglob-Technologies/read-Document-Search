@@ -419,24 +419,13 @@ Page: {page}
 
             STRICT RULES:
             1. Use ONLY the provided documents
-            2. Do NOT hallucinate
-            3. Every statement must be supported
-            4. Use citations like (Document 1, Page X)
-
-            FORMAT YOUR ANSWER EXACTLY LIKE THIS:
-
-            ### Final Answer
-            <clear direct answer with citations>
-
-            ### Technical Explanation
-            <detailed explanation combining documents>
-
-            ### Confidence
-            <number between 0 and 1>
-
-            ### Supporting Evidence
-            - <exact line from document>
-            - <exact line from document>
+            2. DO NOT ignore any relevant section
+            3. DO NOT invent information
+            4. Every statement MUST be supported by text from the documents
+            3. If answer exists, DO NOT say "not available"
+            4. Combine multiple documents if needed
+            5. ALWAYS cite like (Document 1, Page X)
+            6. If unsure → say "Not found in documents"
 
             Documents:
             {context_text}
@@ -446,6 +435,12 @@ Page: {page}
 
             Question:
             {question}
+
+            Return:
+            - Final Answer (with citations)
+            - Technical Explanation
+            - Confidence (0 to 1)
+            - Supporting Evidence (exact lines)
             """
 
         logger.info(f"\nPROMPT:\n{prompt[:1500]}")
