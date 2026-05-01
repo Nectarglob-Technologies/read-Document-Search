@@ -250,36 +250,6 @@ class EngineeringAgent:
 
         return f"[{idx}] {file_name} (Page {real_page})"
     
-    def _verify_answer(self, answer, docs):
-
-        context = " ".join([d.page_content for d in docs[:5]])
-
-        verify_prompt = f"""
-            Check if the answer is fully supported by context.
-
-            Answer:
-            {answer}
-
-            Context:
-            {context}
-
-            Return:
-            - VALID or INVALID
-            - Reason
-            """
-
-        try:
-            result = self.llm.invoke(verify_prompt).content
-
-            if "INVALID" in result.upper():
-                return False, result
-
-            return True, result
-
-        except:
-            return True, "Verification skipped"
-
-    def _strict_verify(self, answer, docs):
 
         context_map = {
             f"Document {i+1}": d.page_content
@@ -317,23 +287,6 @@ class EngineeringAgent:
 
         except Exception as e:
             return True, f"Verification skipped: {e}"
-
-
-    def _make_citations_clickable(self, answer, sources):
-
-        for src in sources:
-            pattern = f"(Document {src['id']}, Page {src['page']})"
-
-            link = f'<a href="{src["file_path"]}#page={src["page"]}" target="_blank">{pattern}</a>'
-
-            answer = answer.replace(pattern, link)
-
-        return answer
-    
-    def _extract_answer_snippet(self, answer):
-        return answer.split(".")[0][:200]
-
-
     # =========================================================
     # 🔹 Build sources in different part
     # =========================================================
@@ -446,7 +399,7 @@ class EngineeringAgent:
             '''
             
             page = doc.metadata.get("page_label") or doc.metadata.get("page") or "Unknown"
-            logger.info(f"\nDOCNO {i+1} \n doc page: {page} \n doc metadata: {doc.metadata}")
+            #logger.info(f"\nDOCNO {i+1} \n doc page: {page} \n doc metadata: {doc.metadata}")
             
             context.append(f"""
 --- DOCUMENT {i+1} ---
@@ -495,34 +448,26 @@ Page: {page}
         # ---------------- LLM ----------------
         try:
             response = self.llm.invoke(prompt).content
-            sources = self._build_sources(top_docs)
-            clickable = self._make_citations_clickable(response, sources)
-            snippet = self._extract_answer_snippet(response)
+            logger.info(f"\nLLM RAW RESPONSE:\n{response}")
+            #is_valid, reason = self._verify_answer(response, top_docs)
 
-            is_valid, reason = self._verify_answer(response, top_docs)
-
-            if not is_valid:
-                logger.warning("⚠️ Answer not grounded. Using extractive fallback")
-                
-                return {
-                    "answer": response,
-                    "docs": top_docs[:5],
-                    "sources": sources,
-                    "clickable": clickable,
-                    "snippet": snippet,
-                    "confidence": round(max(rag_conf, graph_conf), 2),
-                    "rag_conf": rag_conf,
-                    "graph_conf": graph_conf
-                }
+            #if not is_valid:
+            #    logger.warning(f"⚠️ Not grounded: {reason}")
+            return {
+                "answer": response,
+                "docs": top_docs[:5],
+                "query": question,
+                "confidence": round(max(rag_conf, graph_conf), 2),
+                "rag_conf": rag_conf,
+                "graph_conf": graph_conf
+            }
 
         except Exception as e:
             logger.error(f"LLM failed: {e}")
             return {
                 "answer": top_docs[0].page_content,
                 "docs": top_docs[:5],
-                "sources": sources,
-                "clickable": clickable,
-                "snippet": snippet,
+                "query": question,
                 "confidence": rag_conf,
                 "rag_conf": rag_conf,
                 "graph_conf": graph_conf
@@ -530,14 +475,4 @@ Page: {page}
 
         logger.info(f"\nLLM RESPONSE:\n{response}")
 
-        return {
-            "answer": response,
-            "docs": top_docs[:5],
-            "sources": sources,
-            "clickable": clickable,
-            "snippet": snippet,
-            "confidence": round(max(rag_conf, graph_conf), 2),
-            "rag_conf": rag_conf,
-            "graph_conf": graph_conf
-        }
-    
+        

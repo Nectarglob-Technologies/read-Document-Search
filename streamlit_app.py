@@ -291,7 +291,47 @@ def render_response(result):
     import streamlit as st
     import os
     import base64
+    import re
 
+    # =============================
+    # HELPERS
+    # =============================
+    def clean_text(text):
+        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'(\w)\s+(\w)', r'\1\2', text)
+        return text.strip()
+
+    def get_snippet(text, query, window=200):
+        text = clean_text(text)
+        text_lower = text.lower()
+
+        for word in query.lower().split():
+            idx = text_lower.find(word)
+            if idx != -1:
+                start = max(0, idx - window)
+                end = min(len(text), idx + window)
+                return text[start:end]
+
+        return text[:400]
+
+    def deduplicate_docs(docs):
+        seen = set()
+        unique = []
+
+        for d in docs:
+            key = (
+                d.metadata.get("source"),
+                d.metadata.get("page")
+            )
+            if key not in seen:
+                seen.add(key)
+                unique.append(d)
+
+        return unique
+
+    # =============================
+    # VALIDATION
+    # =============================
     if not result:
         st.warning("No response generated.")
         return
@@ -299,11 +339,13 @@ def render_response(result):
     if isinstance(result, dict):
         answer = result.get("answer", "")
         docs = result.get("docs", [])
-        snippet = result.get("snippet", "")
+        query = result.get("query", "")
     else:
-        answer = result
+        answer = str(result)
         docs = []
-        snippet = ""
+        query = ""
+
+    docs = deduplicate_docs(docs)
 
     # =============================
     # ANSWER
@@ -319,22 +361,21 @@ def render_response(result):
     for i, doc in enumerate(docs):
 
         file_path = doc.metadata.get("source")
-        logger.info(f"Source file path {i+1}: {file_path}")
-        file_name = os.path.basename(file_path)
-        logger.info(f"Source file name {i+1}: {file_name}")
+        file_name = os.path.basename(file_path) if file_path else "Unknown"
         page = doc.metadata.get("page_label") or doc.metadata.get("page") or 1
 
         if not file_path:
             continue
 
         try:
-            # 🔥 Convert PDF to base64
+            # =============================
+            # PDF LINK (INLINE)
+            # =============================
             with open(file_path, "rb") as f:
                 base64_pdf = base64.b64encode(f.read()).decode("utf-8")
 
             pdf_url = f"data:application/pdf;base64,{base64_pdf}#page={page}"
 
-            # 🔥 Clickable link (opens new tab)
             st.markdown(
                 f"""
                 **[{i+1}] {file_name} (Page {page})**  
@@ -344,23 +385,15 @@ def render_response(result):
             )
 
             # =============================
-            # 🔍 SHOW MATCHED TEXT (HIGHLIGHT)
+            # SMART SNIPPET (KEY FIX)
             # =============================
-            if snippet:
-                text = doc.page_content.lower()
-                highlight = snippet.lower()
+            snippet = get_snippet(doc.page_content, query)
 
-                highlighted = text.replace(
-                    highlight,
-                    f"**:yellow[{highlight}]**"
-                )
-
-                st.markdown("🔍 Match Preview:")
-                st.write(highlighted[:500])
+            st.markdown("🔍 Match Preview:")
+            st.write(snippet)
 
         except Exception as e:
             st.warning(f"Could not open {file_name}")
-
 
 
 # ============================
